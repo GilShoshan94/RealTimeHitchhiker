@@ -1,5 +1,7 @@
 <resources>
-    <string name="app_name">HitchGo</string>
-    <string name="edit_message">Enter a message</string>
-    <string name="button_send">Send</string>
+    <string name="app_name" translatable="false">HitchGo</string>
+    <string name="button_findRide">Find me a ride</string>
+    <string name="button_giveRide">Give a ride</string>
+    <string name="button_login">Login</string>
+    <string name="button_testCoordinates">Test coordinates</string>
 </resources>
