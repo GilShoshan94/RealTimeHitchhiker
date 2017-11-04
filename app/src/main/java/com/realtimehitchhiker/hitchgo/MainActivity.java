@@ -1,25 +1,84 @@
 package com.realtimehitchhiker.hitchgo;
 
+import android.Manifest;
 import android.content.Intent;
+import android.support.v4.app.ActivityCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
+import android.test.mock.MockPackageManager;
 import android.view.View;
-import android.widget.EditText;
+import android.widget.Button;
+import android.widget.TextView;
 
 public class MainActivity extends AppCompatActivity {
-    public static final String EXTRA_MESSAGE = "com.realtimehitchhiker.hitchgo.MESSAGE";
+    //public static final String EXTRA_MESSAGE = "com.realtimehitchhiker.hitchgo.MESSAGE";
+
+    Button btnShowLocation;
+    TextView txtShowLocation;
+    String message;
+    private static final int REQUEST_CODE_PERMISSION = 2;
+    String mPermission = Manifest.permission.ACCESS_FINE_LOCATION;
+
+    // GPSTracker class
+    GPSTracker gps;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+
+        try {
+            if (ActivityCompat.checkSelfPermission(this, mPermission)
+                    != MockPackageManager.PERMISSION_GRANTED) {
+
+                ActivityCompat.requestPermissions(this, new String[]{mPermission},
+                        REQUEST_CODE_PERMISSION);
+
+                // If any permission above not allowed by user, this condition will execute every time, else your else part will work
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        btnShowLocation = (Button) findViewById(R.id.button_testCoordinates);
+        txtShowLocation = (TextView) findViewById(R.id.textView_testCoordinates);
+
+        // show location button click event
+        btnShowLocation.setOnClickListener(new View.OnClickListener() {
+
+            @Override
+            public void onClick(View arg0) {
+                // create class object
+                gps = new GPSTracker(MainActivity.this);
+
+                // check if GPS enabled
+                if(gps.canGetLocation()){
+
+                    double latitude = gps.getLatitude();
+                    double longitude = gps.getLongitude();
+
+                    message = "Your Location is - \nLat: "
+                            + latitude + "\nLong: " + longitude;
+                    txtShowLocation.setText(message);
+                }else{
+                    // can't get location
+                    // GPS or Network is not enabled
+                    // Ask user to enable GPS/network in settings
+                    gps.showSettingsAlert();
+                }
+
+            }
+        });
     }
 
     /** Called when the user taps the imageButton_settings */
     public void callSettingsActivity(View view) {
+        // Explicit Intent by specifying its class name
         Intent intent = new Intent(this, SettingsActivity.class);
         //EditText editText = (EditText) findViewById(R.id.editText);
         //String message = editText.getText().toString();
         //intent.putExtra(EXTRA_MESSAGE, message);
+        // Starts TargetActivity
         startActivity(intent);
     }
 }
