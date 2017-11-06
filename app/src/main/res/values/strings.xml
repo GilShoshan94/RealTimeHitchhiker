@@ -1,8 +1,15 @@
 <resources>
     <string name="app_name" translatable="false">HitchGo</string>
+    <string name="facebook_app_id">559710814361208</string>
+    <string name="fb_login_protocol_scheme">fb559710814361208</string>
+
     <string name="button_findRide">Find me a ride</string>
     <string name="button_giveRide">Give a ride</string>
     <string name="button_login">Login</string>
     <string name="button_testCoordinates">Test coordinates</string>
     <string name="settings">Settings</string>
+    <string name="fb_status">Status :</string>
+    <string name="name">"Name : "</string>
+    <string name="email">Email :</string>
+    <string name="id">fb ID :</string>
 </resources>

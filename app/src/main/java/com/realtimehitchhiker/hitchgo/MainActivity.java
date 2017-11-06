@@ -10,6 +10,9 @@ import android.view.View;
 import android.widget.Button;
 import android.widget.TextView;
 
+import com.facebook.FacebookSdk;
+import com.facebook.appevents.AppEventsLogger;
+
 public class MainActivity extends AppCompatActivity {
     //public static final String EXTRA_MESSAGE = "com.realtimehitchhiker.hitchgo.MESSAGE";
 
@@ -25,6 +28,11 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        //For Facebook SDK
+        FacebookSdk.sdkInitialize(getApplicationContext());
+        AppEventsLogger.activateApp(this);
+
         setContentView(R.layout.activity_main);
 
         try {
@@ -69,6 +77,13 @@ public class MainActivity extends AppCompatActivity {
 
             }
         });
+    }
+
+    /** Called when the user taps the button_login */
+    public void callLoginActivity(View view) {
+        // Explicit Intent by specifying its class name
+        Intent intent = new Intent(this, LoginActivity.class);
+        startActivity(intent);
     }
 
     /** Called when the user taps the imageButton_settings */
