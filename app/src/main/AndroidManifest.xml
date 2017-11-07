@@ -3,6 +3,7 @@
     package="com.realtimehitchhiker.hitchgo">
 
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.INTERNET" />
 
     <application
@@ -21,20 +22,16 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-
         <activity
             android:name=".SettingsActivity"
             android:label="@string/settings"
-            android:theme="@style/Base.Theme.AppCompat"
-            android:parentActivityName=".MainActivity">
-        </activity>
-
+            android:parentActivityName=".MainActivity"
+            android:theme="@style/Base.Theme.AppCompat"></activity>
         <activity
             android:name=".LoginActivity"
             android:label="@string/button_login"
-            android:theme="@style/Base.Theme.AppCompat"
-            android:parentActivityName=".MainActivity">
-        </activity>
+            android:parentActivityName=".MainActivity"
+            android:theme="@style/Base.Theme.AppCompat"></activity>
 
         <meta-data
             android:name="com.facebook.sdk.ApplicationId"
