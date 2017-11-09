@@ -194,7 +194,8 @@ public class GPSTracker extends Service implements LocationListener {
         // on pressing cancel button
         alertDialog.setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
             public void onClick(DialogInterface dialog, int which) {
-                dialog.cancel();            }
+                dialog.cancel();
+            }
         });
         // Showing Alert Message
         alertDialog.show();
@@ -220,7 +221,7 @@ public class GPSTracker extends Service implements LocationListener {
 
     @Override
     public IBinder onBind(Intent arg0) {
-        return null;
+        return null; //do not allow binding
     }
 
 }

@@ -52,8 +52,7 @@ public class MainActivity extends AppCompatActivity {
                             PERMISSION_LOCATION_REQUEST_CODE);
                 }
             }
-        }
-        catch (Exception e) {
+        } catch (Exception e) {
             e.printStackTrace();
         }
 
@@ -79,20 +78,18 @@ public class MainActivity extends AppCompatActivity {
                                     PERMISSION_LOCATION_REQUEST_CODE);
                         }
                     }
-                }
-                catch (Exception e) {
+                } catch (Exception e) {
                     e.printStackTrace();
                 }
 
                 // check if GPS enabled
-                if(gps.canGetLocation()){
+                if (gps.canGetLocation()) {
                     double latitude = gps.getLatitude();
                     double longitude = gps.getLongitude();
                     message = "Your Location is - \nLat: "
                             + latitude + "\nLong: " + longitude;
                     txtShowLocation.setText(message);
-                }
-                else{
+                } else {
                     // can't get location, GPS and Network are not enabled
                     // Ask user to enable GPS/network in settings
                     gps.showSettingsAlert();
@@ -101,14 +98,18 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
-    /** Called when the user taps the button_login */
+    /**
+     * Called when the user taps the button_login
+     */
     public void callLoginActivity(View view) {
         // Explicit Intent by specifying its class name
         Intent intent = new Intent(this, LoginActivity.class);
         startActivity(intent);
     }
 
-    /** Called when the user taps the imageButton_settings */
+    /**
+     * Called when the user taps the imageButton_settings
+     */
     public void callSettingsActivity(View view) {
         // Explicit Intent by specifying its class name
         Intent intent = new Intent(this, SettingsActivity.class);
@@ -122,7 +123,9 @@ public class MainActivity extends AppCompatActivity {
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == PERMISSION_LOCATION_REQUEST_CODE) {
 
+        }
     }
 
     @Override
