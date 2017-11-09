@@ -53,17 +53,6 @@ public class GPSTracker extends Service implements LocationListener {
                 && ActivityCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED;
     }
 
-    public static void showExplanationAlert(final Context context) {
-        AlertDialog.Builder alertDialog = new AlertDialog.Builder(context);
-        alertDialog.setTitle("App needs Location permission");  // Setting Dialog Title
-        alertDialog.setMessage(R.string.app_name);     // Setting Dialog Message
-        alertDialog.setNegativeButton("I understand", new DialogInterface.OnClickListener() {
-            public void onClick(DialogInterface dialog, int which) {    // on pressing button
-                dialog.dismiss();
-            }
-        });
-        alertDialog.show();     // Showing Alert Message
-    }
 
     public Location getLocation() {
 
@@ -143,37 +132,8 @@ public class GPSTracker extends Service implements LocationListener {
         }
     }
 
-    /**
-     * Function to get latitude
-     * */
-    public double getLatitude(){
-        if(location != null){
-            latitude = location.getLatitude();
-        }
 
-        // return latitude
-        return latitude;
-    }
 
-    /**
-     * Function to get longitude
-     * */
-    public double getLongitude(){
-        if(location != null){
-            longitude = location.getLongitude();
-        }
-
-        // return longitude
-        return longitude;
-    }
-
-    /**
-     * Function to check GPS/wifi enabled
-     * @return boolean
-     * */
-    public boolean canGetLocation() {
-        return this.canGetLocation;
-    }
 
     /**
      * Function to show settings alert dialog
@@ -194,7 +154,8 @@ public class GPSTracker extends Service implements LocationListener {
         // on pressing cancel button
         alertDialog.setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
             public void onClick(DialogInterface dialog, int which) {
-                dialog.cancel();            }
+                dialog.cancel();
+            }
         });
         // Showing Alert Message
         alertDialog.show();
@@ -220,7 +181,7 @@ public class GPSTracker extends Service implements LocationListener {
 
     @Override
     public IBinder onBind(Intent arg0) {
-        return null;
+        return null; //do not allow binding
     }
 
 }
