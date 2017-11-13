@@ -84,6 +84,17 @@ public class MainActivity extends AppCompatActivity {
         registerReceiver(broadcastReceiverLocOff,new IntentFilter(LocationService.BROADCAST_ACTION_LOC_OFF));
     }
 
+    @Override
+    protected void onPause() {
+        super.onPause();
+        if(broadcastReceiverLocUpdate != null){
+            unregisterReceiver(broadcastReceiverLocUpdate);
+        }
+        if(broadcastReceiverLocOff != null){
+            unregisterReceiver(broadcastReceiverLocOff);
+        }
+    }
+
     /**
      * Function to show settings alert dialog
      * On pressing Settings button will launch Settings Options
@@ -97,8 +108,6 @@ public class MainActivity extends AppCompatActivity {
         // On pressing Settings button
         alertDialog.setPositiveButton("Settings", new DialogInterface.OnClickListener() {
             public void onClick(DialogInterface dialog,int which) {
-                dialog.dismiss();
-                dialog.cancel();
                 Intent intent = new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS);
                 getApplicationContext().startActivity(intent);
             }
@@ -106,7 +115,8 @@ public class MainActivity extends AppCompatActivity {
         // on pressing cancel button
         alertDialog.setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
             public void onClick(DialogInterface dialog, int which) {
-                showSettingsAlert();
+                dialog.cancel();
+                //showSettingsAlert();
             }
         });
         // Showing Alert Message

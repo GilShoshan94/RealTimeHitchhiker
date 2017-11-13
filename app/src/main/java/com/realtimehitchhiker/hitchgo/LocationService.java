@@ -10,6 +10,7 @@ import android.location.Criteria;
 import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
+import android.location.LocationProvider;
 import android.os.Bundle;
 import android.os.IBinder;
 import android.provider.Settings;
@@ -23,17 +24,17 @@ import static android.location.LocationProvider.AVAILABLE;
 public class LocationService extends Service {
 
     @SuppressLint("MissingPermission")
-    public static final String BROADCAST_ACTION_LOC_UPDATE = "location_update";
-    public static final String BROADCAST_ACTION_LOC_OFF = "location_off";
+    public static final String BROADCAST_ACTION_LOC_UPDATE = "com.realtimehitchhiker.hitchgo.LOCATION_UPDATE";
+    public static final String BROADCAST_ACTION_LOC_OFF = "com.realtimehitchhiker.hitchgo.LOCATION_OFF";
     private static final String TAG = "TESTGPS";
     private LocationManager mLocationManager = null;
     private Location myLastLocation = null;
-    private boolean[] isProviderAvailable = {false, false, false}; // Passive, Network, GPS
     private final static String passiveProvider = LocationManager.PASSIVE_PROVIDER;
     private final static String networkProvider = LocationManager.NETWORK_PROVIDER;
     private final static String gpsProvider = LocationManager.GPS_PROVIDER;
     public final static String[] providerList = {passiveProvider, networkProvider, gpsProvider};
     public final static String[] activeProviderList = {networkProvider, gpsProvider};
+    private static String lastActiveProvider = networkProvider;
     private MyLocationListener listener = new MyLocationListener();
 
     // The minimum distance to change updates, in meters
@@ -57,9 +58,7 @@ public class LocationService extends Service {
             if (isBetterLocation(location, myLastLocation)){
                 listLoc = location;
                 myLastLocation = location;
-                Intent intent = new Intent(BROADCAST_ACTION_LOC_UPDATE);
-                intent.putExtra("location", myLastLocation);
-                sendBroadcast(intent);
+                broadcastMyLocation();
             }
             else if (isBetterLocation(location, listLoc)){
                 listLoc = location;
@@ -70,42 +69,51 @@ public class LocationService extends Service {
         public void onStatusChanged(String provider, int status, Bundle extras) {
             switch (status){
                 case OUT_OF_SERVICE:
-                    isProviderAvailable[pToI(provider)] = false;
+                    Log.i(TAG, provider + "is OUT_OF_SERVICE" );
                     break;
                 case TEMPORARILY_UNAVAILABLE :
+                    Log.i(TAG, provider + "is TEMPORARILY_UNAVAILABLE" );
                     break;
                 case AVAILABLE :
-                    isProviderAvailable[pToI(provider)] = true;
+                    Log.i(TAG, provider + "is AVAILABLE" );
             }
-            if(isAllActiveProviderDisabled()){
-                Log.i(TAG, "isAllActiveProviderDisabled 2" );
-                Intent intentlocoff = new Intent(BROADCAST_ACTION_LOC_OFF);
-                sendBroadcast(intentlocoff);
-            }
-
         }
 
         @Override
         public void onProviderEnabled(String provider) {
-            isProviderAvailable[pToI(provider)] = true;
+            lastActiveProvider = provider;
         }
 
         @Override
         public void onProviderDisabled(String provider) {
-            isProviderAvailable[pToI(provider)] = false;
-            if(isAllActiveProviderDisabled()){
-                Log.i(TAG, "isAllActiveProviderDisabled 3" );
-                Intent intentlocoff = new Intent(BROADCAST_ACTION_LOC_OFF);
-                sendBroadcast(intentlocoff);
+            Log.i(TAG, "onProviderDisabled " + provider + " ---- " + lastActiveProvider );
+            if(isAllActiveProviderDisabled() && isLastActiveProvider(provider)){
+                Log.i(TAG, "isAllActiveProviderDisabled" );
+                broadcastLocOff();
+            }
+            else if (isLastActiveProvider(provider)){
+                Log.i(TAG, "onProviderDisabled else if " + provider + " ---- " + lastActiveProvider );
+                for (int i = 0; i < activeProviderList.length; i++) {
+                    if (mLocationManager.isProviderEnabled(activeProviderList[i]))
+                        lastActiveProvider = activeProviderList[i];
+                }
+                Log.i(TAG, "lastActiveProvider = " + lastActiveProvider );
             }
         }
+    }
+
+    private boolean isLastActiveProvider(String provider){
+        if (pToI(provider)==pToI(lastActiveProvider))
+            return true;
+        else
+            return false;
     }
 
     /** Helper function
      *
      * @return index for the bool array
      */
-    protected int pToI(String provider){
+    private int pToI(String provider){
         switch (provider){
             case passiveProvider:
                 return 0;
@@ -128,6 +136,17 @@ public class LocationService extends Service {
             return true;
         else
             return false;
+    }
+
+    private void broadcastMyLocation(){
+        Intent intent = new Intent(BROADCAST_ACTION_LOC_UPDATE);
+        intent.putExtra("location", myLastLocation);
+        sendBroadcast(intent);
+    }
+
+    private void broadcastLocOff(){
+        Intent intentlocoff = new Intent(BROADCAST_ACTION_LOC_OFF);
+        sendBroadcast(intentlocoff);
     }
 
     //public LocationService() {
@@ -204,6 +223,7 @@ public class LocationService extends Service {
 
         for (int i = 0; i < providerList.length; i++) {
             try {
+                Log.i(TAG, "requestLocationUpdates : " + i);
                 mLocationManager.requestLocationUpdates(providerList[i], MIN_TIME, MIN_DISTANCE, listener);
             } catch (java.lang.SecurityException ex) {
                 Log.i(TAG, "fail to request location update, ignore", ex);
@@ -226,16 +246,9 @@ public class LocationService extends Service {
             myLastLocation = mLocationManager.getLastKnownLocation(provider);
         if(myLastLocation != null){
             Log.i(TAG, "onStart LastKnownLocation" );
-            Intent intent = new Intent(BROADCAST_ACTION_LOC_UPDATE);
-            intent.putExtra("location", myLastLocation);
-            sendBroadcast(intent);
+            broadcastMyLocation();
         }
 
-        if(isAllActiveProviderDisabled()){
-            Log.i(TAG, "isAllActiveProviderDisabled 1" );
-            Intent intentlocoff = new Intent(BROADCAST_ACTION_LOC_OFF);
-            sendBroadcast(intentlocoff);
-        }
         Log.i(TAG, "provider = "+provider );
         return START_STICKY;
     }
