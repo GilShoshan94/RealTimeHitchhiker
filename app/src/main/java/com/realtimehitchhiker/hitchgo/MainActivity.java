@@ -26,13 +26,38 @@ import android.widget.Toast;
 
 import com.facebook.FacebookSdk;
 import com.facebook.appevents.AppEventsLogger;
+import com.firebase.ui.auth.AuthUI;
+import com.firebase.ui.auth.ErrorCodes;
+import com.firebase.ui.auth.IdpResponse;
+import com.firebase.ui.auth.ResultCodes;
+import com.google.android.gms.tasks.OnCompleteListener;
+import com.google.android.gms.tasks.Task;
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseUser;
+
+import java.util.Arrays;
+import java.util.List;
 
 public class MainActivity extends AppCompatActivity {
     //public static final String EXTRA_MESSAGE = "com.realtimehitchhiker.hitchgo.MESSAGE"; for intent //intent.putExtra(EXTRA_MESSAGE, message); to be unique
+    private static final int PERMISSION_LOCATION_REQUEST_CODE = 2;
+    private static final int RC_SIGN_IN = 123; //FireBase
+    public static final String TAG = "MAIN";
+
+    //FireBase
+    private FirebaseAuth mAuth;
+
+    // Choose authentication providers
+    List<AuthUI.IdpConfig> authProviders = Arrays.asList(
+            new AuthUI.IdpConfig.Builder(AuthUI.EMAIL_PROVIDER).build(),
+            new AuthUI.IdpConfig.Builder(AuthUI.PHONE_VERIFICATION_PROVIDER).build(),
+            new AuthUI.IdpConfig.Builder(AuthUI.GOOGLE_PROVIDER).build(),
+            new AuthUI.IdpConfig.Builder(AuthUI.FACEBOOK_PROVIDER).build(), //to add more permission than the default, add ".setPermissions(Arrays.asList("user_friends"))" before ".build()"
+            new AuthUI.IdpConfig.Builder(AuthUI.TWITTER_PROVIDER).build()
+    );
 
     private Button btnShowLocation;
     private TextView txtShowLocation;
-    private static final int PERMISSION_LOCATION_REQUEST_CODE = 2;
     private BroadcastReceiver broadcastReceiverLocUpdate;
     private BroadcastReceiver broadcastReceiverLocOff;
     private Location location = null;
@@ -43,15 +68,32 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-
+        Log.d(TAG, "MAIN_onCreate" );
         //For Facebook SDK
         FacebookSdk.sdkInitialize(getApplicationContext());
         AppEventsLogger.activateApp(this);
 
         setContentView(R.layout.activity_main);
+        //For FireBase
+        mAuth = FirebaseAuth.getInstance();
+        // Check if user is signed in (non-null) and update UI accordingly.
+        if (mAuth.getCurrentUser() != null) {
+            // already signed in
+            //updateUI(currentUser);
+        } else {
+            // not signed in
+        }
+
         btnShowLocation = (Button) findViewById(R.id.button_testCoordinates);
         txtShowLocation = (TextView) findViewById(R.id.textView_testCoordinates);
+    }
 
+    @Override
+    protected void onStart() {
+        super.onStart();
+        Log.d(TAG, "MAIN_onStart" );
+
+        // Check permissions and start service location
         if(!runtimePermissions())
             enableLocationService();
     }
@@ -59,10 +101,12 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onResume() {
         super.onResume();
+        Log.d(TAG, "MAIN_onResume" );
         if(broadcastReceiverLocUpdate == null){
             broadcastReceiverLocUpdate = new BroadcastReceiver() {
                 @Override
                 public void onReceive(Context context, Intent intent) {
+                    Log.d(LocationService.TAG, LocationService.BROADCAST_ACTION_LOC_UPDATE );
                     location = (Location)intent.getExtras().get("location");
                     txtShowLocation.setText("Lat :\t"+location.getLatitude()
                             +"\nLong :\t"+location.getLongitude()+"\nProvider :\t"
@@ -74,7 +118,7 @@ public class MainActivity extends AppCompatActivity {
             broadcastReceiverLocOff = new BroadcastReceiver() {
                 @Override
                 public void onReceive(Context context, Intent intent) {
-                    Log.i("TESTGPS", "BROADCAST_ACTION_LOC_OFF" );
+                    Log.d(LocationService.TAG, LocationService.BROADCAST_ACTION_LOC_OFF );
                     if(isAllActiveProviderDisabled())
                         showSettingsAlert();
                 }
@@ -87,6 +131,19 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onPause() {
         super.onPause();
+        Log.d(TAG, "MAIN_onPause" );
+    }
+
+    @Override
+    protected void onStop() {
+        super.onStop();
+        Log.d(TAG, "MAIN_onStop" );
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        Log.d(TAG, "MAIN_onDestroy" );
         if(broadcastReceiverLocUpdate != null){
             unregisterReceiver(broadcastReceiverLocUpdate);
         }
@@ -95,51 +152,81 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    /**
-     * Function to show settings alert dialog
-     * On pressing Settings button will launch Settings Options
-     * */
-    public void showSettingsAlert(){
-        AlertDialog.Builder alertDialog = new AlertDialog.Builder(MainActivity.this);
-        // Setting Dialog Title
-        alertDialog.setTitle("GPS is settings");
-        // Setting Dialog Message
-        alertDialog.setMessage("GPS is not enabled. Do you want to go to settings menu?");
-        // On pressing Settings button
-        alertDialog.setPositiveButton("Settings", new DialogInterface.OnClickListener() {
-            public void onClick(DialogInterface dialog,int which) {
-                Intent intent = new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS);
-                getApplicationContext().startActivity(intent);
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == PERMISSION_LOCATION_REQUEST_CODE) {
+            if (grantResults[0] == PackageManager.PERMISSION_GRANTED && grantResults[1] == PackageManager.PERMISSION_GRANTED) {
+                enableLocationService();
+            } else {
+                runtimePermissions();
             }
-        });
-        // on pressing cancel button
-        alertDialog.setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
-            public void onClick(DialogInterface dialog, int which) {
-                dialog.cancel();
-                //showSettingsAlert();
-            }
-        });
-        // Showing Alert Message
-        alertDialog.show();
+        }
     }
 
-    /**
-     * Called when the user taps the button_login
-     */
-    public void callLoginActivity(View view) {
-        // Explicit Intent by specifying its class name
-        Intent intent = new Intent(this, LoginActivity.class);
-        startActivity(intent);
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        Log.d(TAG, "MAIN_onActivityResult" );
+
+        if (requestCode == RC_SIGN_IN) {
+            IdpResponse response = IdpResponse.fromResultIntent(data);
+            if (response != null) {
+                Log.d(TAG, "RC_SIGN_IN_response = " + response.toString());
+            }
+            if (resultCode == RESULT_OK) {
+                // Successfully signed in
+                FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
+                Log.d(TAG, "Successfully signed in = " + user.toString());
+                //startActivity(SignedInActivity.createIntent(this, response));
+                //finish();
+                //return;
+            } else {
+                // Sign in failed, check response for error code
+                Log.d(TAG, "Sign in failed, check response for error code");
+                if (response == null) {
+                    // User pressed back button
+                    //showSnackbar(R.string.sign_in_cancelled);
+                    return;
+                }
+
+                if (response.getErrorCode() == ErrorCodes.NO_NETWORK) {
+                    Log.d(TAG, "no_internet_connection");
+                    //showSnackbar(R.string.no_internet_connection);
+                    return;
+                }
+
+                if (response.getErrorCode() == ErrorCodes.UNKNOWN_ERROR) {
+                    //showSnackbar(R.string.unknown_error);
+                    return;
+                }
+            }
+
+            //showSnackbar(R.string.unknown_sign_in_response);
+        }
     }
 
-    /**
-     * Called when the user taps the imageButton_settings
-     */
-    public void callSettingsActivity(View view) {
-        // Explicit Intent by specifying its class name
-        Intent intent = new Intent(this, SettingsActivity.class);
-        // Starts TargetActivity
-        startActivity(intent);
+    public void logInAuth(View view){
+        // Create and launch sign-in intent
+        startActivityForResult(
+                AuthUI.getInstance()
+                        .createSignInIntentBuilder()
+                        .setAvailableProviders(authProviders)
+                        .setLogo(R.drawable.ic_menu_settings_gear)      // Set logo drawable
+                        .setTheme(R.style.Theme_AppCompat)      // Set theme
+                        .setIsSmartLockEnabled(false) //FOR DEBUG
+                        .build(),
+                RC_SIGN_IN);
+    }
+
+    public void logOutAuth(View v) {
+        AuthUI.getInstance()
+                .signOut(this)
+                .addOnCompleteListener(new OnCompleteListener<Void>() {
+                    public void onComplete(@NonNull Task<Void> task) {
+                        // user is now signed out
+                    }
+                });
     }
 
     private void enableLocationService() {
@@ -148,6 +235,8 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onClick(View view) {
                 if (flag_service == 0) {
+                    Button b = (Button) view;
+                    b.setText("STOP LOC SERVICE");
                     flag_service++;
                     Toast.makeText(getApplicationContext(), "Location Service ON",
                             Toast.LENGTH_SHORT).show();
@@ -155,6 +244,8 @@ public class MainActivity extends AppCompatActivity {
                     startService(i_start);
                 } else {
                     flag_service = 0;
+                    Button b = (Button) view;
+                    b.setText("START LOC SERVICE");
                     Toast.makeText(getApplicationContext(), "Location Service OFF",
                             Toast.LENGTH_SHORT).show();
                     Intent i_stop = new Intent(getApplicationContext(), LocationService.class);
@@ -228,26 +319,51 @@ public class MainActivity extends AppCompatActivity {
             return false;
     }
 
-    @Override
-    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-        if (requestCode == PERMISSION_LOCATION_REQUEST_CODE) {
-            if (grantResults[0] == PackageManager.PERMISSION_GRANTED && grantResults[1] == PackageManager.PERMISSION_GRANTED) {
-                enableLocationService();
-            } else {
-                runtimePermissions();
+    /**
+     * Function to show settings alert dialog
+     * On pressing Settings button will launch Settings Options
+     * */
+    public void showSettingsAlert(){
+        AlertDialog.Builder alertDialog = new AlertDialog.Builder(MainActivity.this);
+        // Setting Dialog Title
+        alertDialog.setTitle("GPS is settings");
+        // Setting Dialog Message
+        alertDialog.setMessage("GPS is not enabled. Do you want to go to settings menu?");
+        // On pressing Settings button
+        alertDialog.setPositiveButton("Settings", new DialogInterface.OnClickListener() {
+            public void onClick(DialogInterface dialog,int which) {
+                Intent intent = new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS);
+                getApplicationContext().startActivity(intent);
             }
-        }
+        });
+        // on pressing cancel button
+        alertDialog.setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
+            public void onClick(DialogInterface dialog, int which) {
+                dialog.cancel();
+                //showSettingsAlert();
+            }
+        });
+        // Showing Alert Message
+        alertDialog.show();
     }
 
-    @Override
-    protected void onDestroy() {
-        super.onDestroy();
-        if(broadcastReceiverLocUpdate != null){
-            unregisterReceiver(broadcastReceiverLocUpdate);
-        }
-        if(broadcastReceiverLocOff != null){
-            unregisterReceiver(broadcastReceiverLocOff);
-        }
+    /**
+     * Called when the user taps the button_login
+     */
+    public void callLoginActivity(View view) {
+        // Explicit Intent by specifying its class name
+        Intent intent = new Intent(this, LoginActivity.class);
+        startActivity(intent);
     }
+
+    /**
+     * Called when the user taps the imageButton_settings
+     */
+    public void callSettingsActivity(View view) {
+        // Explicit Intent by specifying its class name
+        Intent intent = new Intent(this, SettingsActivity.class);
+        // Starts TargetActivity
+        startActivity(intent);
+    }
+
 }

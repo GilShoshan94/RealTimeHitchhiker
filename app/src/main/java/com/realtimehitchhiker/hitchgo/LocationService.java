@@ -26,7 +26,7 @@ public class LocationService extends Service {
     @SuppressLint("MissingPermission")
     public static final String BROADCAST_ACTION_LOC_UPDATE = "com.realtimehitchhiker.hitchgo.LOCATION_UPDATE";
     public static final String BROADCAST_ACTION_LOC_OFF = "com.realtimehitchhiker.hitchgo.LOCATION_OFF";
-    private static final String TAG = "TESTGPS";
+    public static final String TAG = "LOCATION";
     private LocationManager mLocationManager = null;
     private Location myLastLocation = null;
     private final static String passiveProvider = LocationManager.PASSIVE_PROVIDER;
@@ -49,7 +49,7 @@ public class LocationService extends Service {
 
         public MyLocationListener()
         {
-            Log.i(TAG, "LocationListener" );
+            Log.d(TAG, "LocationListener" );
             listLoc = null;
         }
 
@@ -69,13 +69,13 @@ public class LocationService extends Service {
         public void onStatusChanged(String provider, int status, Bundle extras) {
             switch (status){
                 case OUT_OF_SERVICE:
-                    Log.i(TAG, provider + "is OUT_OF_SERVICE" );
+                    Log.d(TAG, provider + "is OUT_OF_SERVICE" );
                     break;
                 case TEMPORARILY_UNAVAILABLE :
-                    Log.i(TAG, provider + "is TEMPORARILY_UNAVAILABLE" );
+                    Log.d(TAG, provider + "is TEMPORARILY_UNAVAILABLE" );
                     break;
                 case AVAILABLE :
-                    Log.i(TAG, provider + "is AVAILABLE" );
+                    Log.d(TAG, provider + "is AVAILABLE" );
             }
         }
 
@@ -86,18 +86,18 @@ public class LocationService extends Service {
 
         @Override
         public void onProviderDisabled(String provider) {
-            Log.i(TAG, "onProviderDisabled " + provider + " ---- " + lastActiveProvider );
+            Log.d(TAG, "onProviderDisabled " + provider + " ---- " + lastActiveProvider );
             if(isAllActiveProviderDisabled() && isLastActiveProvider(provider)){
-                Log.i(TAG, "isAllActiveProviderDisabled" );
+                Log.d(TAG, "isAllActiveProviderDisabled" );
                 broadcastLocOff();
             }
             else if (isLastActiveProvider(provider)){
-                Log.i(TAG, "onProviderDisabled else if " + provider + " ---- " + lastActiveProvider );
+                Log.d(TAG, "onProviderDisabled else if " + provider + " ---- " + lastActiveProvider );
                 for (int i = 0; i < activeProviderList.length; i++) {
                     if (mLocationManager.isProviderEnabled(activeProviderList[i]))
                         lastActiveProvider = activeProviderList[i];
                 }
-                Log.i(TAG, "lastActiveProvider = " + lastActiveProvider );
+                Log.d(TAG, "lastActiveProvider = " + lastActiveProvider );
             }
         }
     }
@@ -223,10 +223,10 @@ public class LocationService extends Service {
 
         for (int i = 0; i < providerList.length; i++) {
             try {
-                Log.i(TAG, "requestLocationUpdates : " + i);
+                Log.d(TAG, "requestLocationUpdates : " + i);
                 mLocationManager.requestLocationUpdates(providerList[i], MIN_TIME, MIN_DISTANCE, listener);
             } catch (java.lang.SecurityException ex) {
-                Log.i(TAG, "fail to request location update, ignore", ex);
+                Log.d(TAG, "fail to request location update, ignore", ex);
             } catch (IllegalArgumentException ex) {
                 Log.d(TAG,providerList[i] + " provider does not exist, " + ex.getMessage());
             }
@@ -238,18 +238,18 @@ public class LocationService extends Service {
     public int onStartCommand(Intent i, int flags, int startId)
     {
         super.onStartCommand(i, flags, startId);
-        Log.i(TAG, "onStartCommand" );
+        Log.d(TAG, "onStartCommand" );
         Criteria criteria = new Criteria();
         criteria.setAccuracy(Criteria.ACCURACY_FINE);
         String provider = mLocationManager.getBestProvider(criteria, true);
         if(provider != null)
             myLastLocation = mLocationManager.getLastKnownLocation(provider);
         if(myLastLocation != null){
-            Log.i(TAG, "onStart LastKnownLocation" );
+            Log.d(TAG, "onStart LastKnownLocation" );
             broadcastMyLocation();
         }
 
-        Log.i(TAG, "provider = "+provider );
+        Log.d(TAG, "provider = "+provider );
         return START_STICKY;
     }
 
@@ -259,9 +259,9 @@ public class LocationService extends Service {
         if (mLocationManager != null) {
             try {
                 mLocationManager.removeUpdates(listener);
-                Log.i(TAG, "Remove location listener ");
+                Log.d(TAG, "Remove location listener ");
             } catch (Exception ex) {
-                Log.i(TAG, "fail to remove location listeners, ignore", ex);
+                Log.d(TAG, "fail to remove location listeners, ignore", ex);
             }
         }
     }

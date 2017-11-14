@@ -50,7 +50,7 @@
         android:layout_height="wrap_content"
         android:layout_marginEnd="16dp"
         android:layout_marginStart="16dp"
-        android:onClick="callLoginActivity"
+        android:onClick="logInAuth"
         android:text="@string/button_login"
         app:layout_constraintBottom_toTopOf="@+id/button_testCoordinates"
         app:layout_constraintEnd_toEndOf="parent"

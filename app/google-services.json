@@ -1,0 +1,55 @@
+{
+  "project_info": {
+    "project_number": "257418742024",
+    "firebase_url": "https://hitchgo-app.firebaseio.com",
+    "project_id": "hitchgo-app",
+    "storage_bucket": "hitchgo-app.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:257418742024:android:b0375263332b26f4",
+        "android_client_info": {
+          "package_name": "com.realtimehitchhiker.hitchgo"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "257418742024-khqpl3hfohogkl9tpi1b4gopd7sjpm07.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.realtimehitchhiker.hitchgo",
+            "certificate_hash": "bc3d64083531d724e46715de8be96ad161a892d1"
+          }
+        },
+        {
+          "client_id": "257418742024-8vv0p0us8kd30nbacp7c8igo7u6bi1p5.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDb086Q7bEUdEsAXQuZTdxbP-reflPBqDQ"
+        }
+      ],
+      "services": {
+        "analytics_service": {
+          "status": 1
+        },
+        "appinvite_service": {
+          "status": 2,
+          "other_platform_oauth_client": [
+            {
+              "client_id": "257418742024-8vv0p0us8kd30nbacp7c8igo7u6bi1p5.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        },
+        "ads_service": {
+          "status": 2
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

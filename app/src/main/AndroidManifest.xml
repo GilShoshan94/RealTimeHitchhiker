@@ -1,10 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
     package="com.realtimehitchhiker.hitchgo">
 
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.INTERNET" />
+
     <uses-feature android:name="android.hardware.location.network" />
     <uses-feature android:name="android.hardware.location.gps" />
 
@@ -14,7 +16,15 @@
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
-        android:theme="@style/AppTheme">
+        android:theme="@style/Base.Theme.AppCompat">
+
+        <!-- META_DATA -->
+        <meta-data
+            android:name="com.facebook.sdk.ApplicationId"
+            android:value="@string/facebook_application_id"
+            tools:replace="android:value" />
+
+        <!-- ACTIVITY -->
         <activity
             android:name=".MainActivity"
             android:theme="@style/Base.Theme.AppCompat">
@@ -34,11 +44,6 @@
             android:label="@string/button_login"
             android:parentActivityName=".MainActivity"
             android:theme="@style/Base.Theme.AppCompat" />
-
-        <meta-data
-            android:name="com.facebook.sdk.ApplicationId"
-            android:value="@string/facebook_app_id" />
-
         <activity
             android:name="com.facebook.FacebookActivity"
             android:configChanges="keyboard|keyboardHidden|screenLayout|screenSize|orientation"
@@ -52,14 +57,22 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
 
-                <data android:scheme="@string/fb_login_protocol_scheme" />
+                <data android:scheme="@string/facebook_login_protocol_scheme" />
             </intent-filter>
         </activity>
 
+        <!-- SERVICE -->
         <service
             android:name=".LocationService"
             android:enabled="true"
             android:exported="false" />
+
+        <!-- RECEIVER -->
+        <receiver
+            android:name=".LocationReceiver"
+            android:enabled="true"
+            android:exported="false"></receiver>
+
     </application>
 
 </manifest>
