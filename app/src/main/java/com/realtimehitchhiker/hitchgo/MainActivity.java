@@ -52,11 +52,12 @@ public class MainActivity extends AppCompatActivity {
             new AuthUI.IdpConfig.Builder(AuthUI.EMAIL_PROVIDER).build(),
             new AuthUI.IdpConfig.Builder(AuthUI.PHONE_VERIFICATION_PROVIDER).build(),
             new AuthUI.IdpConfig.Builder(AuthUI.GOOGLE_PROVIDER).build(),
-            new AuthUI.IdpConfig.Builder(AuthUI.FACEBOOK_PROVIDER).build(), //to add more permission than the default, add ".setPermissions(Arrays.asList("user_friends"))" before ".build()"
-            new AuthUI.IdpConfig.Builder(AuthUI.TWITTER_PROVIDER).build()
+            new AuthUI.IdpConfig.Builder(AuthUI.FACEBOOK_PROVIDER).build()//, //to add more permission than the default, add ".setPermissions(Arrays.asList("user_friends"))" before ".build()"
+            //new AuthUI.IdpConfig.Builder(AuthUI.TWITTER_PROVIDER).build()
     );
 
     private Button btnShowLocation;
+    private Button btnLog;
     private TextView txtShowLocation;
     private BroadcastReceiver broadcastReceiverLocUpdate;
     private BroadcastReceiver broadcastReceiverLocOff;
@@ -64,6 +65,7 @@ public class MainActivity extends AppCompatActivity {
 
     //flag
     int flag_service = 0;
+    int flag_login = 0;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -76,16 +78,10 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
         //For FireBase
         mAuth = FirebaseAuth.getInstance();
-        // Check if user is signed in (non-null) and update UI accordingly.
-        if (mAuth.getCurrentUser() != null) {
-            // already signed in
-            //updateUI(currentUser);
-        } else {
-            // not signed in
-        }
 
         btnShowLocation = (Button) findViewById(R.id.button_testCoordinates);
         txtShowLocation = (TextView) findViewById(R.id.textView_testCoordinates);
+        btnLog = (Button) findViewById(R.id.button_login);
     }
 
     @Override
@@ -96,6 +92,17 @@ public class MainActivity extends AppCompatActivity {
         // Check permissions and start service location
         if(!runtimePermissions())
             enableLocationService();
+
+        enableLogButtton();
+
+        //For FireBase
+        // Check if user is signed in (non-null) and update UI accordingly.
+        if (mAuth.getCurrentUser() != null) {
+            // already signed in
+            //updateUI(currentUser);
+        } else {
+            // not signed in
+        }
     }
 
     @Override
@@ -227,6 +234,27 @@ public class MainActivity extends AppCompatActivity {
                         // user is now signed out
                     }
                 });
+    }
+
+    private void enableLogButtton() {
+        btnLog.setOnClickListener(new View.OnClickListener(){
+            @Override
+            public void onClick(View view) {
+                if (flag_login == 0) {
+                    Button b = (Button) view;
+                    b.setText(R.string.button_logout);
+                    flag_login++;
+                    logInAuth(view);
+
+                } else {
+                    flag_login = 0;
+                    Button b = (Button) view;
+                    b.setText(R.string.button_login);
+                    logOutAuth(view);
+
+                }
+            }
+        });
     }
 
     private void enableLocationService() {
