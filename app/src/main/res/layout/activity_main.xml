@@ -16,21 +16,9 @@
         android:background="@drawable/ic_menu_settings_gear"
         android:onClick="callSettingsActivity"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintTop_toTopOf="parent" />
-
-    <Button
-        android:id="@+id/button_findRide"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginEnd="16dp"
-        android:layout_marginStart="16dp"
-        android:onClick="testFirebase"
-        android:text="@string/button_findRide"
-        app:layout_constraintBottom_toTopOf="@+id/button_giveRide"
-        app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintHorizontal_bias="0.5"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/imageButton_settings" />
+        app:layout_constraintStart_toEndOf="@+id/textView_welcome_profile"
+        app:layout_constraintTop_toTopOf="parent" />
 
     <Button
         android:id="@+id/button_giveRide"
@@ -38,10 +26,10 @@
         android:layout_height="wrap_content"
         android:layout_marginEnd="16dp"
         android:layout_marginStart="16dp"
+        android:onClick="addRideToFirebase"
         android:text="@string/button_giveRide"
         app:layout_constraintBottom_toTopOf="@+id/button_login"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintHorizontal_bias="0.5"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@+id/button_findRide" />
 
@@ -51,25 +39,16 @@
         android:layout_height="wrap_content"
         android:layout_marginEnd="16dp"
         android:layout_marginStart="16dp"
+        android:background="@drawable/com_facebook_button_background"
+        android:drawableLeft="@drawable/com_facebook_button_icon_blue"
+        android:elevation="0dp"
         android:text="@string/button_login"
-        app:layout_constraintBottom_toTopOf="@+id/button_testCoordinates"
+        app:layout_constraintBottom_toTopOf="@+id/textView_testCoordinates"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintHorizontal_bias="0.5"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@+id/button_giveRide" />
 
-    <Button
-        android:id="@+id/button_testCoordinates"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginEnd="16dp"
-        android:layout_marginStart="16dp"
-        android:text="@string/button_testCoordinates"
-        app:layout_constraintBottom_toTopOf="@+id/textView_testCoordinates"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintHorizontal_bias="0.5"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/button_login" />
 
     <TextView
         android:id="@+id/textView_testCoordinates"
@@ -82,6 +61,42 @@
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintHorizontal_bias="0.5"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/button_testCoordinates" />
+        app:layout_constraintTop_toBottomOf="@+id/button_login" />
+
+    <ImageView
+        android:id="@+id/profile_image"
+        android:layout_width="100dp"
+        android:layout_height="100dp"
+        android:layout_marginStart="16dp"
+        android:layout_marginTop="16dp"
+        app:layout_constraintEnd_toStartOf="@+id/textView_welcome_profile"
+        app:layout_constraintHorizontal_chainStyle="spread_inside"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:srcCompat="@drawable/com_facebook_profile_picture_blank_square" />
+
+    <Button
+        android:id="@+id/button_findRide"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginEnd="16dp"
+        android:layout_marginStart="16dp"
+        android:layout_marginTop="16dp"
+        android:text="@string/button_findRide"
+        app:layout_constraintBottom_toTopOf="@+id/button_giveRide"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/profile_image" />
+
+    <TextView
+        android:id="@+id/textView_welcome_profile"
+        android:layout_width="100dp"
+        android:layout_height="0dp"
+        android:layout_marginTop="24dp"
+        android:text="Welcome"
+        app:layout_constraintEnd_toStartOf="@+id/imageButton_settings"
+        app:layout_constraintHorizontal_bias="0.5"
+        app:layout_constraintStart_toEndOf="@+id/profile_image"
+        app:layout_constraintTop_toTopOf="parent" />
 
 </android.support.constraint.ConstraintLayout>
