@@ -34,6 +34,9 @@ import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.Task;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
+import com.google.firebase.database.DatabaseReference;
+import com.google.firebase.database.FirebaseDatabase;
+import com.google.firebase.database.IgnoreExtraProperties;
 
 import java.util.Arrays;
 import java.util.List;
@@ -46,6 +49,7 @@ public class MainActivity extends AppCompatActivity {
 
     //FireBase
     private FirebaseAuth mAuth;
+    private FirebaseDatabase database;
 
     // Choose authentication providers
     List<AuthUI.IdpConfig> authProviders = Arrays.asList(
@@ -78,6 +82,7 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
         //For FireBase
         mAuth = FirebaseAuth.getInstance();
+        database = FirebaseDatabase.getInstance();
 
         btnShowLocation = (Button) findViewById(R.id.button_testCoordinates);
         txtShowLocation = (TextView) findViewById(R.id.textView_testCoordinates);
@@ -103,6 +108,7 @@ public class MainActivity extends AppCompatActivity {
         } else {
             // not signed in
         }
+
     }
 
     @Override
@@ -392,6 +398,47 @@ public class MainActivity extends AppCompatActivity {
         Intent intent = new Intent(this, SettingsActivity.class);
         // Starts TargetActivity
         startActivity(intent);
+    }
+
+    @IgnoreExtraProperties
+    public class User {
+
+        public String username;
+        //public String email;
+        public String lat;
+        public String lon;
+
+        public User() {
+            // Default constructor required for calls to DataSnapshot.getValue(User.class)
+            username = "Gil";
+            //lat=location.getLatitude();
+            //lon=location.getLongitude();
+            lat="0.0";
+            lon="1.0";
+        }
+
+        //public User(String username) {
+          //  this.username = username;
+        //}
+
+    }
+    public void testFirebase(View view) {
+        //User user = new User();
+        Double lat=location.getLatitude();
+        Double lon=location.getLongitude();
+        //DatabaseReference myRef = database.getReference();
+        DatabaseReference mDatabase = FirebaseDatabase.getInstance().getReference();
+        mDatabase.child("users").child("1245678").child("name").setValue("Gil");
+        mDatabase.child("users").child("1245678").child("latitude").setValue(lat);
+        mDatabase.child("users").child("1245678").child("longtitude").setValue(lon);
+        //mDatabase.child("users").child("1245678").child("phoneNumber").setValue();
+
+
+
+    }
+
+    public void test2firebase(View view){
+
     }
 
 }
