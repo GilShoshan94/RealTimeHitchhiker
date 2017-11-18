@@ -7,6 +7,7 @@ import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
@@ -57,6 +58,8 @@ public class MainActivity extends AppCompatActivity {
     private static final int RC_SIGN_IN = 123; //FireBase
     public static final String TAG = "MAIN_DEBUG";
 
+    private SharedPreferences sharedPref;
+
     //FireBase
     private FirebaseAuth mAuth;
     private FirebaseUser currentUser;
@@ -93,6 +96,7 @@ public class MainActivity extends AppCompatActivity {
         AppEventsLogger.activateApp(this);
 
         setContentView(R.layout.activity_main);
+
         //For FireBase
         mAuth = FirebaseAuth.getInstance();
         currentUser = mAuth.getCurrentUser();
@@ -107,6 +111,14 @@ public class MainActivity extends AppCompatActivity {
         //imProfile.setMaxWidth(100);
         imProfile.setScaleType(ImageView.ScaleType.CENTER_CROP);
         imProfile.setCropToPadding(true);
+
+        sharedPref = this.getSharedPreferences(
+                getString(R.string.preference_file_key), Context.MODE_PRIVATE);
+        /*SharedPreferences.Editor editor = sharedPref.edit();
+        editor.putInt(getString(R.string.saved_high_score), newHighScore);
+        editor.commit();
+        int defaultValue = getResources().getInteger(R.string.saved_high_score_default);
+        long highScore = sharedPref.getInt(getString(R.string.saved_high_score), defaultValue);*/
 
         // Check if user is signed in (non-null) and update UI accordingly.
         updateUI(currentUser);
@@ -207,10 +219,11 @@ public class MainActivity extends AppCompatActivity {
                 //FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
                 currentUser = mAuth.getCurrentUser();
                 updateUI(currentUser);
+                ///////////////////////////////////////////////////////
                 Log.d(TAG, "Successfully signed in = " + currentUser.toString());
-                Log.d(TAG, "Successfully signed in = " + currentUser.getDisplayName());////////////////////////////////
-                Log.d(TAG, "Successfully signed in = " + currentUser.getEmail());////////////////////////////////
-                Log.d(TAG, "Successfully signed in = " + currentUser.getPhoneNumber());////////////////////////////////
+                Log.d(TAG, "Successfully signed in = " + currentUser.getDisplayName());
+                Log.d(TAG, "Successfully signed in = " + currentUser.getEmail());
+                Log.d(TAG, "Successfully signed in = " + currentUser.getPhoneNumber());
                 Log.d(TAG, "Successfully signed in = " + currentUser.getProviderId());
                 Log.d(TAG, "Successfully signed in = " + currentUser.getProviders());
                 Log.d(TAG, "Successfully signed in = " + currentUser.getProviderData());
@@ -220,28 +233,27 @@ public class MainActivity extends AppCompatActivity {
                 Log.d(TAG, "Successfully signed in = " + currentUser.getUid());
                 Log.d(TAG, "Successfully signed in = " + currentUser.getIdToken(true));
                 Log.d(TAG, "Successfully signed in = " + currentUser.getIdToken(false));
-                Log.d(TAG, "Successfully signed in = " + currentUser.getPhotoUrl());////////////////////////////////
-                //startActivity(SignedInActivity.createIntent(this, response));
-                //finish();
-                //return;
+                Log.d(TAG, "Successfully signed in = " + currentUser.getPhotoUrl());
+                ///////////////////////////////////////////////////////
             } else {
                 // Sign in failed, check response for error code
                 Log.d(TAG, "Sign in failed, check response for error code");
                 if (response == null) {
                     // User pressed back button
-                    //showSnackbar(R.string.sign_in_cancelled);
+                    Toast.makeText(getApplicationContext(), "Sign in cancelled by the user",
+                            Toast.LENGTH_SHORT).show();
                     return;
                 }
 
                 if (response.getErrorCode() == ErrorCodes.NO_NETWORK) {
                     Log.d(TAG, "no_internet_connection");
-                    //showSnackbar(R.string.no_internet_connection);
+                    Toast.makeText(getApplicationContext(), "No Internet Connection",
+                            Toast.LENGTH_SHORT).show();
                     return;
                 }
 
                 if (response.getErrorCode() == ErrorCodes.UNKNOWN_ERROR) {
-                    //showSnackbar(R.string.unknown_error);
-                    return;
+                    Log.e(TAG, "UNKNOWN_ERROR");
                 }
             }
 
@@ -337,11 +349,11 @@ public class MainActivity extends AppCompatActivity {
         }
 
         protected Bitmap doInBackground(String... urls) {
-            String urldisplay = urls[0];
+            String urlDisplay = urls[0];
             Bitmap mIcon = null;
             InputStream in = null;
             try {
-                in = new java.net.URL(urldisplay).openStream();
+                in = new java.net.URL(urlDisplay).openStream();
                 mIcon = BitmapFactory.decodeStream(in);
             } catch (Exception e) {
                 Log.e("Error", e.getMessage());
@@ -351,9 +363,9 @@ public class MainActivity extends AppCompatActivity {
                     try {
                         in.close();
                     }
-                    catch(IOException ioex) {
+                    catch(IOException ioEx) {
                         //Very bad things just happened... handle it
-                        Log.wtf(TAG, "Stream.close throw exception :" + ioex );
+                        Log.wtf(TAG, "Stream.close throw exception :" + ioEx );
                     }
                 }
             }
@@ -425,15 +437,14 @@ public class MainActivity extends AppCompatActivity {
 
     private boolean isAllActiveProviderDisabled(){
         int tot=0;
-        LocationManager locman = (LocationManager) getApplicationContext().getSystemService(Context.LOCATION_SERVICE);
+        LocationManager locMan = (LocationManager) getApplicationContext().getSystemService(Context.LOCATION_SERVICE);
+        if(locMan==null)
+            return true;
         for (int i = 0; i < LocationService.activeProviderList.length; i++) {
-            if (!locman.isProviderEnabled(LocationService.activeProviderList[i]))
+            if (!locMan.isProviderEnabled(LocationService.activeProviderList[i]))
                 tot++;
         }
-        if (tot == LocationService.activeProviderList.length)
-            return true;
-        else
-            return false;
+        return (tot == LocationService.activeProviderList.length);
     }
 
     /**
@@ -463,7 +474,6 @@ public class MainActivity extends AppCompatActivity {
         // Showing Alert Message
         alertDialog.show();
     }
-
 
     /**
      * Called when the user taps the imageButton_settings
