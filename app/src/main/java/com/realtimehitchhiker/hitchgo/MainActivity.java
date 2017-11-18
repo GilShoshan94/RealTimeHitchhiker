@@ -17,10 +17,8 @@ import android.os.Build;
 import android.provider.Settings;
 import android.support.annotation.NonNull;
 import android.support.v4.app.ActivityCompat;
-import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
-import android.test.mock.MockPackageManager;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
@@ -34,16 +32,18 @@ import com.facebook.login.widget.ProfilePictureView;
 import com.firebase.ui.auth.AuthUI;
 import com.firebase.ui.auth.ErrorCodes;
 import com.firebase.ui.auth.IdpResponse;
-import com.firebase.ui.auth.ResultCodes;
 import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.Task;
 import com.google.firebase.auth.FacebookAuthProvider;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.auth.UserInfo;
+import com.google.firebase.database.DataSnapshot;
+import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.database.IgnoreExtraProperties;
+import com.google.firebase.database.ValueEventListener;
 
 
 import java.io.IOException;
@@ -61,6 +61,7 @@ public class MainActivity extends AppCompatActivity {
     private FirebaseAuth mAuth;
     private FirebaseUser currentUser;
     private FirebaseDatabase database;
+    private DatabaseReference myDataBaseRef;
 
     private String facebookUserId = null;
     private String photoUrl = null;
@@ -96,6 +97,7 @@ public class MainActivity extends AppCompatActivity {
         mAuth = FirebaseAuth.getInstance();
         currentUser = mAuth.getCurrentUser();
         database = FirebaseDatabase.getInstance();
+        myDataBaseRef = database.getReference();
 
         txtShowLocation = (TextView) findViewById(R.id.textView_testCoordinates);
         txtWelcome = (TextView) findViewById(R.id.textView_welcome_profile);
@@ -103,7 +105,7 @@ public class MainActivity extends AppCompatActivity {
         imProfile = (ImageView) findViewById(R.id.profile_image);
         //imProfile.setMaxHeight(100);
         //imProfile.setMaxWidth(100);
-        //imProfile.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        imProfile.setScaleType(ImageView.ScaleType.CENTER_CROP);
         imProfile.setCropToPadding(true);
 
         // Check if user is signed in (non-null) and update UI accordingly.
@@ -212,6 +214,9 @@ public class MainActivity extends AppCompatActivity {
                 Log.d(TAG, "Successfully signed in = " + currentUser.getProviderId());
                 Log.d(TAG, "Successfully signed in = " + currentUser.getProviders());
                 Log.d(TAG, "Successfully signed in = " + currentUser.getProviderData());
+                // currentUser.getUid() : The user's ID, unique to the Firebase project.
+                // Do NOT use this value to authenticate with your backend server, if you have one. Use
+                // FirebaseUser.getToken() instead....
                 Log.d(TAG, "Successfully signed in = " + currentUser.getUid());
                 Log.d(TAG, "Successfully signed in = " + currentUser.getIdToken(true));
                 Log.d(TAG, "Successfully signed in = " + currentUser.getIdToken(false));
@@ -244,7 +249,7 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    public void logInAuth(View view){
+    public void logInAuth(){
         // Create and launch sign-in intent
         startActivityForResult(
                 AuthUI.getInstance()
@@ -257,7 +262,7 @@ public class MainActivity extends AppCompatActivity {
                 RC_SIGN_IN);
     }
 
-    public void logOutAuth(View v) {
+    public void logOutAuth() {
         AuthUI.getInstance()
                 .signOut(this)
                 .addOnCompleteListener(new OnCompleteListener<Void>() {
@@ -271,7 +276,7 @@ public class MainActivity extends AppCompatActivity {
                 });
     }
 
-    private void enableLogButtton(boolean bool) {
+    private void enableLogButton(boolean bool) {
         if (bool){ //already signed in
             flag_login = 1;
             btnLog.setText(R.string.button_logout);
@@ -287,13 +292,13 @@ public class MainActivity extends AppCompatActivity {
                     Button b = (Button) view;
                     b.setText(R.string.button_logout);
                     flag_login = 1;
-                    logInAuth(view);
+                    logInAuth();
 
                 } else {
                     flag_login = 0;
                     Button b = (Button) view;
                     b.setText(R.string.button_login);
-                    logOutAuth(view);
+                    logOutAuth();
 
                 }
             }
@@ -303,8 +308,8 @@ public class MainActivity extends AppCompatActivity {
     private void updateUI(FirebaseUser user){
         if(user!=null){
             //already signed in
-            enableLogButtton(true);
             txtWelcome.setText("Welcome back " + user.getDisplayName());
+            enableLogButton(true);
             // find the Facebook profile and get the user's id
             for(UserInfo profile : currentUser.getProviderData()) {
                 // check if the provider id matches "facebook.com"
@@ -318,7 +323,7 @@ public class MainActivity extends AppCompatActivity {
             new DownloadImageTask(imProfile).execute(photoUrl);
         }
         else{
-            enableLogButtton(false);
+            enableLogButton(false);
             txtWelcome.setText("Welcome, please log in");
             imProfile.setImageResource(R.drawable.com_facebook_profile_picture_blank_square);
         }
@@ -459,14 +464,6 @@ public class MainActivity extends AppCompatActivity {
         alertDialog.show();
     }
 
-    /**
-     * Called when the user taps the button_login
-     */
-    public void callLoginActivity(View view) {
-        // Explicit Intent by specifying its class name
-        Intent intent = new Intent(this, LoginActivity.class);
-        startActivity(intent);
-    }
 
     /**
      * Called when the user taps the imageButton_settings
@@ -478,8 +475,8 @@ public class MainActivity extends AppCompatActivity {
         startActivity(intent);
     }
 
-
     public void addRideToFirebase(View view) {
+        Log.d(TAG, "addRideToFirebase" );
         if(location==null){
             Toast.makeText(getApplicationContext(), "Enable location or wait for location fix",
                     Toast.LENGTH_SHORT).show();
@@ -493,16 +490,39 @@ public class MainActivity extends AppCompatActivity {
         Double lat=location.getLatitude();
         Double lon=location.getLongitude();
         DatabaseReference myRef = database.getReference();
+        //DatabaseReference myRef2 = database.getReference("users/"+facebookUserId+"/name");
+        //DatabaseReference myRef3 = database.getReference("testRef");
 
         myRef.child("users").child(facebookUserId).child("name").setValue(currentUser.getDisplayName());
         myRef.child("users").child(facebookUserId).child("latitude").setValue(lat);
         myRef.child("users").child(facebookUserId).child("longitude").setValue(lon);
+        //myRef2.setValue("Test");
+        //myRef3.setValue("Hola");
 
+        MyUser myUser = new MyUser("Donald Trump", "smallhands@gamil.com");
 
+        myRef.child("users").child("999999999").setValue(myUser);
 
     }
 
-    public void test2firebase(View view){
+    public void findRideFromFireBase(View view){
+        // Read from the database
+        myDataBaseRef.addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override
+            public void onDataChange(DataSnapshot dataSnapshot) {
+                // This method is called once with the initial value and again
+                // whenever data at this location is updated.
+                //MyUser myUser = dataSnapshot.getValue(MyUser.class);
+                Log.d(TAG, "DATABASE FirebaseDatabase Value is: " + database.toString());
+                Log.d(TAG, "DATABASE Value is: " + dataSnapshot.toString());
+            }
+
+            @Override
+            public void onCancelled(DatabaseError error) {
+                // Failed to read value
+                Log.w(TAG, "DATABASE Failed to read value.", error.toException());
+            }
+        });
 
     }
 
