@@ -475,6 +475,10 @@ public class MainActivity extends AppCompatActivity {
         startActivity(intent);
     }
 
+    public void addUserToFirebase(){
+
+    }
+
     public void addRideToFirebase(View view) {
         Log.d(TAG, "addRideToFirebase" );
         if(location==null){
@@ -487,22 +491,12 @@ public class MainActivity extends AppCompatActivity {
                     Toast.LENGTH_SHORT).show();
             return;
         }
-        Double lat=location.getLatitude();
-        Double lon=location.getLongitude();
-        DatabaseReference myRef = database.getReference();
-        //DatabaseReference myRef2 = database.getReference("users/"+facebookUserId+"/name");
-        //DatabaseReference myRef3 = database.getReference("testRef");
 
-        myRef.child("users").child(facebookUserId).child("name").setValue(currentUser.getDisplayName());
-        myRef.child("users").child(facebookUserId).child("latitude").setValue(lat);
-        myRef.child("users").child(facebookUserId).child("longitude").setValue(lon);
-        //myRef2.setValue("Test");
-        //myRef3.setValue("Hola");
-
-        MyUser myUser = new MyUser("Donald Trump", "smallhands@gamil.com");
-
-        myRef.child("users").child("999999999").setValue(myUser);
-
+        DatabaseReference myRef = myDataBaseRef.child("users/"+facebookUserId);
+        MyUser myUser = new MyUser(currentUser.getDisplayName(), currentUser.getEmail(),
+                                    currentUser.getPhoneNumber(),
+                                    location.getLatitude(), location.getLongitude());
+        myRef.setValue(myUser);
     }
 
     public void findRideFromFireBase(View view){
