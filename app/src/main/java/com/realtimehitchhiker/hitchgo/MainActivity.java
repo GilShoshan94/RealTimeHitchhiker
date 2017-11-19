@@ -1,6 +1,7 @@
 package com.realtimehitchhiker.hitchgo;
 
 import android.Manifest;
+import android.annotation.SuppressLint;
 import android.app.AlertDialog;
 import android.content.BroadcastReceiver;
 import android.content.Context;
@@ -47,23 +48,33 @@ import com.google.firebase.database.ValueEventListener;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ThreadLocalRandom;
 
 public class MainActivity extends AppCompatActivity {
     //public static final String EXTRA_MESSAGE = "com.realtimehitchhiker.hitchgo.MESSAGE"; for intent //intent.putExtra(EXTRA_MESSAGE, message); to be unique
     private static final int PERMISSION_LOCATION_REQUEST_CODE = 2;
     private static final int RC_SIGN_IN = 123; //FireBase
+    public static final double LAT_MIN = -90.0, LAT_MAX = 90.0, LNG_MIN = -180.0, LNG_MAX = 180.0;
+    public static final double EARTH_RADIUS = 6371008.8; //in meter the mean radius of Earth is 6371008.8 m
     public static final String TAG = "MAIN_DEBUG";
 
     private SharedPreferences sharedPref;
-    private int radius;
+    private int radius; // in meters
 
     //FireBase
     private FirebaseAuth mAuth;
     private FirebaseUser currentUser;
     private FirebaseDatabase database;
     private DatabaseReference myDataBaseRef;
+    private DatabaseReference refUsers;
+    private DatabaseReference refSupply;
+    private DatabaseReference refDemand;
+    private DatabaseReference refHistory;
 
     private String facebookUserId = null;
     private String photoUrl = null;
@@ -82,6 +93,8 @@ public class MainActivity extends AppCompatActivity {
     private ImageView imProfile;
     private BroadcastReceiver broadcastReceiverLocUpdate, broadcastReceiverLocOff;
     private Location location = null;
+    private Double latitude = null;
+    private Double longitude = null;
 
     //flag
     private int flag_login = 0;
@@ -101,6 +114,10 @@ public class MainActivity extends AppCompatActivity {
         currentUser = mAuth.getCurrentUser();
         database = FirebaseDatabase.getInstance();
         myDataBaseRef = database.getReference();
+        refUsers = myDataBaseRef.child("users/");
+        refSupply = myDataBaseRef.child("supply/");
+        refDemand = myDataBaseRef.child("demand/");
+        refHistory = myDataBaseRef.child("history/");
 
         txtShowLocation = (TextView) findViewById(R.id.textView_testCoordinates);
         txtWelcome = (TextView) findViewById(R.id.textView_welcome_profile);
@@ -138,13 +155,16 @@ public class MainActivity extends AppCompatActivity {
         Log.d(TAG, "MAIN_onResume" );
         if(broadcastReceiverLocUpdate == null){
             broadcastReceiverLocUpdate = new BroadcastReceiver() {
+                @SuppressLint("SetTextI18n")
                 @Override
                 public void onReceive(Context context, Intent intent) {
                     Log.d(LocationService.TAG, LocationService.BROADCAST_ACTION_LOC_UPDATE );
                     location = (Location)intent.getExtras().get("location");
-                    txtShowLocation.setText("Lat :\t"+location.getLatitude()
-                            +"\nLong :\t"+location.getLongitude()+"\nProvider :\t"
-                            +location.getProvider());
+                    if(location!=null){
+                        latitude = location.getLatitude();
+                        longitude = location.getLongitude();
+                        txtShowLocation.setText("Lat :\t"+latitude+"\nLong :\t"+longitude+"\nProvider :\t"+location.getProvider());
+                    }
                 }
             };
         }
@@ -259,7 +279,7 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    public void logInAuth(){
+    private void logInAuth(){
         // Create and launch sign-in intent
         startActivityForResult(
                 AuthUI.getInstance()
@@ -272,7 +292,7 @@ public class MainActivity extends AppCompatActivity {
                 RC_SIGN_IN);
     }
 
-    public void logOutAuth() {
+    private void logOutAuth() {
         AuthUI.getInstance()
                 .signOut(this)
                 .addOnCompleteListener(new OnCompleteListener<Void>() {
@@ -485,16 +505,20 @@ public class MainActivity extends AppCompatActivity {
 
     public void addUserIfNewInFireBase() {
         Log.d(TAG, "addUserIfNewInFireBase" );
-        Log.d(TAG, "facebookUserId = " + facebookUserId );
-        DatabaseReference myRef = myDataBaseRef.child("users/");
-        Query checkKeyQuery = myRef.orderByKey().equalTo(facebookUserId);
+        if(facebookUserId==null){
+            Toast.makeText(getApplicationContext(), "ERROR : addNewUserToFirebase\nYou are not logged in\nLog in please",
+                    Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        Query checkKeyQuery = refUsers.orderByKey().equalTo(facebookUserId);
         checkKeyQuery.addListenerForSingleValueEvent(new ValueEventListener() {
             @Override
             public void onDataChange(DataSnapshot dataSnapshot) {
                 Log.d(TAG, "addUserIfNewInFireBase onDataChange" );
                 Log.d(TAG, "DATABASE Value is: " + dataSnapshot.toString());
                 if(!dataSnapshot.exists()){
-                    addNewUserToFirebase();
+                    addNewUserToFireBase();
                 }
             }
 
@@ -506,7 +530,7 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
-    public void addNewUserToFirebase(){
+    public void addNewUserToFireBase(){
         Log.d(TAG, "addNewUserToFirebase" );
         if(currentUser==null){
             Toast.makeText(getApplicationContext(), "ERROR : addNewUserToFirebase\nYou are not logged in\nLog in please",
@@ -514,13 +538,13 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
 
-        DatabaseReference myRef = myDataBaseRef.child("users/"+facebookUserId);
+        DatabaseReference myRef = refUsers.child(facebookUserId);
         MyUser myUser = new MyUser(currentUser.getDisplayName(), currentUser.getEmail(),
                                     currentUser.getPhoneNumber());
         myRef.setValue(myUser);
     }
 
-    public void addRideToFirebase(View view) {
+    public void addRideToFireBase(View view) {
         Log.d(TAG, "addRideToFirebase" );
         if(location==null){
             Toast.makeText(getApplicationContext(), "Enable location or wait for location fix",
@@ -533,11 +557,21 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
 
+        //Test remainingSeats
         Long remainingSeats = new Long(2);
-        DatabaseReference myRef = myDataBaseRef.child("supply/"+facebookUserId);
-        MySupply mySupply = new MySupply(location.getLatitude(), location.getLongitude(),
-                                            remainingSeats);
-        myRef.setValue(mySupply);
+        //MySupply mySupply = new MySupply(facebookUserId, remainingSeats, latitude, longitude);
+        //FOR TEST
+        MySupply mySupply = new MySupply(facebookUserId, remainingSeats, randomLatGen(), randomLonGen());
+        refSupply.push().setValue(mySupply);
+
+        //TEST HISTORY
+        Map<String, Boolean> myIDMap = new HashMap<>();
+        myIDMap.put("Gil", true);
+        myIDMap.put("Rivka", true);
+        myIDMap.put("Pavel", true);
+        MyHistory myHistory = new MyHistory(facebookUserId, myIDMap, latitude, longitude, latitude, longitude);
+        refHistory.push().setValue(myHistory);
+
     }
 
     public void addDemandToFireBase(View view){
@@ -553,25 +587,24 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
 
-        DatabaseReference myRef = myDataBaseRef.child("demand/"+facebookUserId);
-        MyDemand myDemand = new MyDemand(location.getLatitude(), location.getLongitude());
-        myRef.setValue(myDemand);
+        //Test requestingSeats
+        Long requestingSeats = new Long(2);
+        MyDemand myDemand = new MyDemand(facebookUserId, requestingSeats, latitude, longitude);
+        refDemand.push().setValue(myDemand);
 
         findRideFromFireBase();
     }
 
     public void findRideFromFireBase(){
         // Read from the database
-        DatabaseReference myRef = myDataBaseRef.child("supply/");
-        Query findRideQuery = myRef.orderByValue();
-        myDataBaseRef.addListenerForSingleValueEvent(new ValueEventListener() {
+        Query findRideQuery = refSupply.limitToFirst(1);
+        findRideQuery.addListenerForSingleValueEvent(new ValueEventListener() {
             @Override
             public void onDataChange(DataSnapshot dataSnapshot) {
-                // This method is called once with the initial value and again
-                // whenever data at this location is updated.
-                //MyUser myUser = dataSnapshot.getValue(MyUser.class);
-                Log.d(TAG, "DATABASE FirebaseDatabase Value is: " + database.toString());
                 Log.d(TAG, "DATABASE Value is: " + dataSnapshot.toString());
+                for(DataSnapshot singleSnapshot : dataSnapshot.getChildren()){
+                    //user = singleSnapshot.getValue(User.class);
+                }
             }
 
             @Override
@@ -584,5 +617,46 @@ public class MainActivity extends AppCompatActivity {
         Toast.makeText(getApplicationContext(), "Enable location or wait for location fix",
                 Toast.LENGTH_LONG).show();
     }
+
+    private double approxLatDelta(){
+        double latDelta = (180/Math.PI)*(radius/EARTH_RADIUS);
+        return latDelta;
+    }
+    private double approxLngDelta(){
+        double lngDelta = (180/Math.PI)*(radius/EARTH_RADIUS)*(1/Math.cos(latitude));
+        return lngDelta;
+    }
+
+    //FOR TESTING
+    public double randomLatGen(){
+        double min = 32.701475;
+        double max = 32.826854;
+        double random = ThreadLocalRandom.current().nextDouble(min, max);
+        return random;
+    }
+    public double randomLonGen(){
+        double min = 34.984293;
+        double max = 35.131003;
+        double random = ThreadLocalRandom.current().nextDouble(min, max);
+        return random;
+    }
+
+    /*
+        //TEST LIST
+        DatabaseReference myRefList = myDataBaseRef.child("list/");
+        List<String> myList = new ArrayList<String>();
+        myList.add("un");
+        myList.add("deux");
+        myList.add("trois");
+        myRefList.push().setValue(myList);
+
+        //TEST MAP
+        DatabaseReference myRefMap = myDataBaseRef.child("map/");
+        Map<String, Boolean> myMap = new HashMap<>();
+        myMap.put("un", true);
+        myMap.put("deux", true);
+        myMap.put("trois", true);
+        myRefMap.push().setValue(myMap);
+        */
 
 }

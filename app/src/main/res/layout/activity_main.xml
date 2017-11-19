@@ -63,7 +63,7 @@
         android:layout_height="wrap_content"
         android:layout_marginEnd="16dp"
         android:layout_marginStart="16dp"
-        android:onClick="addRideToFirebase"
+        android:onClick="addRideToFireBase"
         android:text="@string/button_giveRide"
         app:layout_constraintBottom_toTopOf="@+id/button_login"
         app:layout_constraintEnd_toEndOf="parent"
