@@ -1,10 +1,9 @@
 package com.realtimehitchhiker.hitchgo;
 
 import android.content.Context;
-import android.content.Intent;
 import android.content.SharedPreferences;
-import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
+import android.support.v7.app.AppCompatActivity;
 import android.widget.SeekBar;
 import android.widget.TextView;
 
@@ -14,6 +13,8 @@ public class SettingsActivity extends AppCompatActivity {
     private TextView txtShowRadius;
     private SeekBar barRadius;
     private int radius;
+    private int minimum;
+    private int maximum;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -26,20 +27,25 @@ public class SettingsActivity extends AppCompatActivity {
 
         sharedPref = this.getSharedPreferences(
                 getString(R.string.preference_file_key), Context.MODE_PRIVATE);
-        int defaultValue = getResources().getInteger(R.integer.pref_radius_min);
-        radius = sharedPref.getInt(getString(R.string.pref_radius), defaultValue);
+        minimum = getResources().getInteger(R.integer.pref_radius_min);
+        maximum = getResources().getInteger(R.integer.pref_radius_max);
+        radius = sharedPref.getInt(getString(R.string.pref_radius), minimum); //minimum = defaultValue
 
         txtShowRadius = (TextView) findViewById(R.id.textView_prefs_radius_unit);
         barRadius = (SeekBar) findViewById(R.id.seekBar_prefs_radius);
 
-        txtShowRadius.setText(radius + R.string.pref_radius_unit);
-        barRadius.setProgress(radius);
+        txtShowRadius.setText(String.valueOf(radius));
+        txtShowRadius.append(" " + getString(R.string.pref_radius_unit));
+
+        barRadius.setMax(maximum - minimum);
+        barRadius.setProgress((radius - minimum));
 
         barRadius.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override
             public void onProgressChanged(SeekBar seekBar, int i, boolean b) {
-                radius = barRadius.getProgress();
-                txtShowRadius.setText(radius + R.string.pref_radius_unit);
+                radius = (barRadius.getProgress() + minimum);
+                txtShowRadius.setText(String.valueOf(radius));
+                txtShowRadius.append(" " + getString(R.string.pref_radius_unit));
 
                 SharedPreferences.Editor editor = sharedPref.edit();
                 editor.putInt(getString(R.string.pref_radius), radius);

@@ -15,11 +15,11 @@ import android.location.Location;
 import android.location.LocationManager;
 import android.os.AsyncTask;
 import android.os.Build;
+import android.os.Bundle;
 import android.provider.Settings;
 import android.support.annotation.NonNull;
 import android.support.v4.app.ActivityCompat;
 import android.support.v7.app.AppCompatActivity;
-import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
@@ -29,7 +29,6 @@ import android.widget.Toast;
 
 import com.facebook.FacebookSdk;
 import com.facebook.appevents.AppEventsLogger;
-import com.facebook.login.widget.ProfilePictureView;
 import com.firebase.ui.auth.AuthUI;
 import com.firebase.ui.auth.ErrorCodes;
 import com.firebase.ui.auth.IdpResponse;
@@ -43,9 +42,8 @@ import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
-import com.google.firebase.database.IgnoreExtraProperties;
+import com.google.firebase.database.Query;
 import com.google.firebase.database.ValueEventListener;
-
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -59,6 +57,7 @@ public class MainActivity extends AppCompatActivity {
     public static final String TAG = "MAIN_DEBUG";
 
     private SharedPreferences sharedPref;
+    private int radius;
 
     //FireBase
     private FirebaseAuth mAuth;
@@ -114,11 +113,9 @@ public class MainActivity extends AppCompatActivity {
 
         sharedPref = this.getSharedPreferences(
                 getString(R.string.preference_file_key), Context.MODE_PRIVATE);
-        /*SharedPreferences.Editor editor = sharedPref.edit();
-        editor.putInt(getString(R.string.saved_high_score), newHighScore);
-        editor.commit();
-        int defaultValue = getResources().getInteger(R.string.saved_high_score_default);
-        long highScore = sharedPref.getInt(getString(R.string.saved_high_score), defaultValue);*/
+        int defaultValue = getResources().getInteger(R.integer.pref_radius_min);
+        radius = sharedPref.getInt(getString(R.string.pref_radius), defaultValue);
+        Log.d(TAG, "getSharedPreferences : radius = " + radius );
 
         // Check if user is signed in (non-null) and update UI accordingly.
         updateUI(currentUser);
@@ -219,6 +216,7 @@ public class MainActivity extends AppCompatActivity {
                 //FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
                 currentUser = mAuth.getCurrentUser();
                 updateUI(currentUser);
+                addUserIfNewInFireBase();
                 ///////////////////////////////////////////////////////
                 Log.d(TAG, "Successfully signed in = " + currentUser.toString());
                 Log.d(TAG, "Successfully signed in = " + currentUser.getDisplayName());
@@ -485,8 +483,41 @@ public class MainActivity extends AppCompatActivity {
         startActivity(intent);
     }
 
-    public void addUserToFirebase(){
+    public void addUserIfNewInFireBase() {
+        Log.d(TAG, "addUserIfNewInFireBase" );
+        Log.d(TAG, "facebookUserId = " + facebookUserId );
+        DatabaseReference myRef = myDataBaseRef.child("users/");
+        Query checkKeyQuery = myRef.orderByKey().equalTo(facebookUserId);
+        checkKeyQuery.addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override
+            public void onDataChange(DataSnapshot dataSnapshot) {
+                Log.d(TAG, "addUserIfNewInFireBase onDataChange" );
+                Log.d(TAG, "DATABASE Value is: " + dataSnapshot.toString());
+                if(!dataSnapshot.exists()){
+                    addNewUserToFirebase();
+                }
+            }
 
+            @Override
+            public void onCancelled(DatabaseError databaseError) {
+                // Failed to read value
+                Log.w(TAG, "DATABASE Failed to read value.", databaseError.toException());
+            }
+        });
+    }
+
+    public void addNewUserToFirebase(){
+        Log.d(TAG, "addNewUserToFirebase" );
+        if(currentUser==null){
+            Toast.makeText(getApplicationContext(), "ERROR : addNewUserToFirebase\nYou are not logged in\nLog in please",
+                    Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        DatabaseReference myRef = myDataBaseRef.child("users/"+facebookUserId);
+        MyUser myUser = new MyUser(currentUser.getDisplayName(), currentUser.getEmail(),
+                                    currentUser.getPhoneNumber());
+        myRef.setValue(myUser);
     }
 
     public void addRideToFirebase(View view) {
@@ -502,15 +533,37 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
 
-        DatabaseReference myRef = myDataBaseRef.child("users/"+facebookUserId);
-        MyUser myUser = new MyUser(currentUser.getDisplayName(), currentUser.getEmail(),
-                                    currentUser.getPhoneNumber(),
-                                    location.getLatitude(), location.getLongitude());
-        myRef.setValue(myUser);
+        Long remainingSeats = new Long(2);
+        DatabaseReference myRef = myDataBaseRef.child("supply/"+facebookUserId);
+        MySupply mySupply = new MySupply(location.getLatitude(), location.getLongitude(),
+                                            remainingSeats);
+        myRef.setValue(mySupply);
     }
 
-    public void findRideFromFireBase(View view){
+    public void addDemandToFireBase(View view){
+        Log.d(TAG, "addDemandToFireBase" );
+        if(location==null){
+            Toast.makeText(getApplicationContext(), "Enable location or wait for location fix",
+                    Toast.LENGTH_SHORT).show();
+            return;
+        }
+        if(currentUser==null){
+            Toast.makeText(getApplicationContext(), "You are not logged in\nLog in please",
+                    Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        DatabaseReference myRef = myDataBaseRef.child("demand/"+facebookUserId);
+        MyDemand myDemand = new MyDemand(location.getLatitude(), location.getLongitude());
+        myRef.setValue(myDemand);
+
+        findRideFromFireBase();
+    }
+
+    public void findRideFromFireBase(){
         // Read from the database
+        DatabaseReference myRef = myDataBaseRef.child("supply/");
+        Query findRideQuery = myRef.orderByValue();
         myDataBaseRef.addListenerForSingleValueEvent(new ValueEventListener() {
             @Override
             public void onDataChange(DataSnapshot dataSnapshot) {
@@ -528,6 +581,8 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
+        Toast.makeText(getApplicationContext(), "Enable location or wait for location fix",
+                Toast.LENGTH_LONG).show();
     }
 
 }
