@@ -25,11 +25,19 @@ import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.ImageView;
+import android.widget.SeekBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import com.facebook.FacebookSdk;
 import com.facebook.appevents.AppEventsLogger;
+import com.firebase.geofire.GeoFire;
+import com.firebase.geofire.GeoLocation;
+import com.firebase.geofire.GeoQuery;
+import com.firebase.geofire.GeoQueryEventListener;
+import com.firebase.geofire.core.GeoHash;
+import com.firebase.geofire.core.GeoHashQuery;
+import com.firebase.geofire.util.GeoUtils;
 import com.firebase.ui.auth.AuthUI;
 import com.firebase.ui.auth.ErrorCodes;
 import com.firebase.ui.auth.IdpResponse;
@@ -48,6 +56,7 @@ import com.google.firebase.database.ValueEventListener;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -62,9 +71,12 @@ public class MainActivity extends AppCompatActivity {
     public static final double LAT_MIN = -90.0, LAT_MAX = 90.0, LNG_MIN = -180.0, LNG_MAX = 180.0;
     public static final double EARTH_RADIUS = 6371008.8; //in meter the mean radius of Earth is 6371008.8 m
     public static final String TAG = "MAIN_DEBUG";
+    private static Integer count=0; // FOR TEST
 
     private SharedPreferences sharedPref;
     private int radius; // in meters
+    private int seats_in_car;
+    private int demand_seats;
 
     //FireBase
     private FirebaseAuth mAuth;
@@ -75,6 +87,9 @@ public class MainActivity extends AppCompatActivity {
     private DatabaseReference refSupply;
     private DatabaseReference refDemand;
     private DatabaseReference refHistory;
+    private GeoFire geoFireSupply;
+    private GeoFire geoFireDemand;
+    private MyGlobalHistory globalHistory;
 
     private String facebookUserId = null;
     private String photoUrl = null;
@@ -89,6 +104,8 @@ public class MainActivity extends AppCompatActivity {
     );
 
     private Button btnLog;
+    private Button btnSupply;
+    private Button btnDemand;
     private TextView txtShowLocation, txtWelcome;
     private ImageView imProfile;
     private BroadcastReceiver broadcastReceiverLocUpdate, broadcastReceiverLocOff;
@@ -98,6 +115,8 @@ public class MainActivity extends AppCompatActivity {
 
     //flag
     private int flag_login = 0;
+    private boolean flag_supply;
+    private boolean flag_demand;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -118,10 +137,15 @@ public class MainActivity extends AppCompatActivity {
         refSupply = myDataBaseRef.child("supply/");
         refDemand = myDataBaseRef.child("demand/");
         refHistory = myDataBaseRef.child("history/");
+        geoFireSupply = new GeoFire(myDataBaseRef.child("geofire/geofire-supply"));
+        geoFireDemand = new GeoFire(myDataBaseRef.child("geofire/geofire-demand"));
+        globalHistory = new MyGlobalHistory(refHistory);
 
         txtShowLocation = (TextView) findViewById(R.id.textView_testCoordinates);
         txtWelcome = (TextView) findViewById(R.id.textView_welcome_profile);
         btnLog = (Button) findViewById(R.id.button_login);
+        btnSupply = (Button) findViewById(R.id.button_giveRide);
+        btnDemand = (Button) findViewById(R.id.button_findRide);
         imProfile = (ImageView) findViewById(R.id.profile_image);
         //imProfile.setMaxHeight(100);
         //imProfile.setMaxWidth(100);
@@ -132,6 +156,10 @@ public class MainActivity extends AppCompatActivity {
                 getString(R.string.preference_file_key), Context.MODE_PRIVATE);
         int defaultValue = getResources().getInteger(R.integer.pref_radius_min);
         radius = sharedPref.getInt(getString(R.string.pref_radius), defaultValue);
+        seats_in_car = sharedPref.getInt(getString(R.string.pref_supply_seats_in_car), 1);
+        demand_seats = sharedPref.getInt(getString(R.string.pref_supply_seats_in_car), 1);
+        flag_supply = sharedPref.getBoolean(getString(R.string.pref_supply_status), false);
+        flag_demand = sharedPref.getBoolean(getString(R.string.pref_demand_status), false);
         Log.d(TAG, "getSharedPreferences : radius = " + radius );
 
         // Check if user is signed in (non-null) and update UI accordingly.
@@ -142,6 +170,9 @@ public class MainActivity extends AppCompatActivity {
     protected void onStart() {
         super.onStart();
         Log.d(TAG, "MAIN_onStart" );
+
+        enableSupplyButton();
+        enableDemandButton();
 
         // Check permissions and start service location
         if(!runtimePermissions())
@@ -246,8 +277,7 @@ public class MainActivity extends AppCompatActivity {
                 Log.d(TAG, "Successfully signed in = " + currentUser.getProviders());
                 Log.d(TAG, "Successfully signed in = " + currentUser.getProviderData());
                 // currentUser.getUid() : The user's ID, unique to the Firebase project.
-                // Do NOT use this value to authenticate with your backend server, if you have one. Use
-                // FirebaseUser.getToken() instead....
+                // Do NOT use this value to authenticate with your backend server, if you have one.
                 Log.d(TAG, "Successfully signed in = " + currentUser.getUid());
                 Log.d(TAG, "Successfully signed in = " + currentUser.getIdToken(true));
                 Log.d(TAG, "Successfully signed in = " + currentUser.getIdToken(false));
@@ -274,8 +304,6 @@ public class MainActivity extends AppCompatActivity {
                     Log.e(TAG, "UNKNOWN_ERROR");
                 }
             }
-
-            //showSnackbar(R.string.unknown_sign_in_response);
         }
     }
 
@@ -331,6 +359,64 @@ public class MainActivity extends AppCompatActivity {
                     logOutAuth();
 
                 }
+            }
+        });
+    }
+
+    private void enableSupplyButton() {
+        if (flag_supply){ //already supplying
+            btnSupply.setText(R.string.button_giveRide_cancel);
+        }
+        else {
+            btnSupply.setText(R.string.button_giveRide);
+        }
+        btnSupply.setOnClickListener(new View.OnClickListener(){
+            @Override
+            public void onClick(View view) {
+                Button b = (Button) view;
+                if (!flag_supply) {
+                    if(addSupplyToFireBase()){
+                        flag_supply = true;
+                        b.setText(R.string.button_giveRide_cancel);
+                    }
+                } else {
+                    if(removeSupplyFromFireBase()) {
+                        flag_supply = false;
+                        b.setText(R.string.button_giveRide);
+                    }
+                }
+                SharedPreferences.Editor editor = sharedPref.edit();
+                editor.putBoolean(getString(R.string.pref_supply_status), flag_supply);
+                editor.apply();
+            }
+        });
+    }
+
+    private void enableDemandButton() {
+        if (flag_demand){ //already demanding
+            btnDemand.setText(R.string.button_findRide_cancel);
+        }
+        else {
+            btnDemand.setText(R.string.button_findRide);
+        }
+        btnDemand.setOnClickListener(new View.OnClickListener(){
+            @Override
+            public void onClick(View view) {
+                Button b = (Button) view;
+                if (!flag_demand) {
+                    if(addDemandToFireBase()){
+                        flag_demand = true;
+                        b.setText(R.string.button_findRide_cancel);
+                    }
+                } else {
+                    if(removeDemandFromFireBase()){
+                        flag_demand = false;
+                        b.setText(R.string.button_findRide);
+                    }
+                }
+                SharedPreferences.Editor editor = sharedPref.edit();
+                editor.putBoolean(getString(R.string.pref_demand_status), flag_demand);
+                editor.apply();
             }
         });
     }
@@ -472,18 +558,18 @@ public class MainActivity extends AppCompatActivity {
     public void showLocationSettingsAlert(){
         AlertDialog.Builder alertDialog = new AlertDialog.Builder(MainActivity.this);
         // Setting Dialog Title
-        alertDialog.setTitle("GPS is settings");
+        alertDialog.setTitle(R.string.alert_dialog_location_title);
         // Setting Dialog Message
-        alertDialog.setMessage("GPS is not enabled. Do you want to go to settings menu?");
+        alertDialog.setMessage(R.string.alert_dialog_location_message);
         // On pressing Settings button
-        alertDialog.setPositiveButton("Settings", new DialogInterface.OnClickListener() {
+        alertDialog.setPositiveButton(R.string.alert_dialog_ok, new DialogInterface.OnClickListener() {
             public void onClick(DialogInterface dialog,int which) {
                 Intent intent = new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS);
                 getApplicationContext().startActivity(intent);
             }
         });
         // on pressing cancel button
-        alertDialog.setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
+        alertDialog.setNegativeButton(R.string.alert_dialog_cancel, new DialogInterface.OnClickListener() {
             public void onClick(DialogInterface dialog, int which) {
                 dialog.cancel();
                 showLocationSettingsAlert();
@@ -520,6 +606,9 @@ public class MainActivity extends AppCompatActivity {
                 if(!dataSnapshot.exists()){
                     addNewUserToFireBase();
                 }
+                else {
+                    checkSupplyDemandStatusAndUpdateUI();
+                }
             }
 
             @Override
@@ -530,7 +619,7 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
-    public void addNewUserToFireBase(){
+    private void addNewUserToFireBase(){
         Log.d(TAG, "addNewUserToFirebase" );
         if(currentUser==null){
             Toast.makeText(getApplicationContext(), "ERROR : addNewUserToFirebase\nYou are not logged in\nLog in please",
@@ -544,119 +633,240 @@ public class MainActivity extends AppCompatActivity {
         myRef.setValue(myUser);
     }
 
-    public void addRideToFireBase(View view) {
-        Log.d(TAG, "addRideToFirebase" );
-        if(location==null){
-            Toast.makeText(getApplicationContext(), "Enable location or wait for location fix",
-                    Toast.LENGTH_SHORT).show();
-            return;
-        }
-        if(currentUser==null){
-            Toast.makeText(getApplicationContext(), "You are not logged in\nLog in please",
-                    Toast.LENGTH_SHORT).show();
-            return;
-        }
-
-        //Test remainingSeats
-        Long remainingSeats = new Long(2);
-        //MySupply mySupply = new MySupply(facebookUserId, remainingSeats, latitude, longitude);
-        //FOR TEST
-        MySupply mySupply = new MySupply(facebookUserId, remainingSeats, randomLatGen(), randomLonGen());
-        refSupply.push().setValue(mySupply);
-
-        //TEST HISTORY
-        Map<String, Boolean> myIDMap = new HashMap<>();
-        myIDMap.put("Gil", true);
-        myIDMap.put("Rivka", true);
-        myIDMap.put("Pavel", true);
-        MyHistory myHistory = new MyHistory(facebookUserId, myIDMap, latitude, longitude, latitude, longitude);
-        refHistory.push().setValue(myHistory);
-
-    }
-
-    public void addDemandToFireBase(View view){
-        Log.d(TAG, "addDemandToFireBase" );
-        if(location==null){
-            Toast.makeText(getApplicationContext(), "Enable location or wait for location fix",
-                    Toast.LENGTH_SHORT).show();
-            return;
-        }
-        if(currentUser==null){
-            Toast.makeText(getApplicationContext(), "You are not logged in\nLog in please",
-                    Toast.LENGTH_SHORT).show();
-            return;
-        }
-
-        //Test requestingSeats
-        Long requestingSeats = new Long(2);
-        MyDemand myDemand = new MyDemand(facebookUserId, requestingSeats, latitude, longitude);
-        refDemand.push().setValue(myDemand);
-
-        findRideFromFireBase();
-    }
-
-    public void findRideFromFireBase(){
-        // Read from the database
-        Query findRideQuery = refSupply.limitToFirst(1);
-        findRideQuery.addListenerForSingleValueEvent(new ValueEventListener() {
+    private void checkSupplyDemandStatusAndUpdateUI(){
+        Query checkKeyDemandQuery = refDemand.orderByKey().equalTo(facebookUserId);
+        checkKeyDemandQuery.addListenerForSingleValueEvent(new ValueEventListener() {
             @Override
             public void onDataChange(DataSnapshot dataSnapshot) {
-                Log.d(TAG, "DATABASE Value is: " + dataSnapshot.toString());
-                for(DataSnapshot singleSnapshot : dataSnapshot.getChildren()){
-                    //user = singleSnapshot.getValue(User.class);
+                Log.d(TAG, "DATABASE checkSupplyDemandStatusAndUpdateUI: " + dataSnapshot.toString());
+                if(dataSnapshot.exists()){
+                    flag_demand = true;
+                    enableDemandButton();
                 }
             }
 
             @Override
-            public void onCancelled(DatabaseError error) {
+            public void onCancelled(DatabaseError databaseError) {
                 // Failed to read value
-                Log.w(TAG, "DATABASE Failed to read value.", error.toException());
+                Log.w(TAG, "DATABASE Failed to read value.", databaseError.toException());
             }
         });
 
-        Toast.makeText(getApplicationContext(), "Enable location or wait for location fix",
-                Toast.LENGTH_LONG).show();
+        Query checkKeySupplyQuery = refSupply.orderByKey().equalTo(facebookUserId);
+        checkKeySupplyQuery.addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override
+            public void onDataChange(DataSnapshot dataSnapshot) {
+                Log.d(TAG, "DATABASE checkSupplyDemandStatusAndUpdateUI: " + dataSnapshot.toString());
+                if(dataSnapshot.exists()){
+                    flag_supply = true;
+                    enableSupplyButton();
+                }
+            }
+
+            @Override
+            public void onCancelled(DatabaseError databaseError) {
+                // Failed to read value
+                Log.w(TAG, "DATABASE Failed to read value.", databaseError.toException());
+            }
+        });
     }
 
-    private double approxLatDelta(){
-        double latDelta = (180/Math.PI)*(radius/EARTH_RADIUS);
-        return latDelta;
+    public boolean addSupplyToFireBase() {
+        Log.d(TAG, "addRideToFireBase" );
+        if(location==null){
+            Toast.makeText(getApplicationContext(), "Enable location or wait for location fix",
+                    Toast.LENGTH_SHORT).show();
+            return false;
+        }
+        if(currentUser==null){
+            Toast.makeText(getApplicationContext(), "You are not logged in\nLog in please",
+                    Toast.LENGTH_SHORT).show();
+            return false;
+        }
+
+        Long remainingSeats = (long) chooseNumberSupplyAlert();
+        MySupply mySupply = new MySupply(remainingSeats);
+        refSupply.child(facebookUserId).setValue(mySupply);
+        //FOR TEST
+        Double lat = randomLatGen(), lng = randomLngGen();
+        count++;
+        String index = facebookUserId+(count).toString();
+
+        geoFireSupply.setLocation(index, new GeoLocation(lat, lng)); //For Test use index, normal use facebookUserId;
+        return true;
     }
-    private double approxLngDelta(){
-        double lngDelta = (180/Math.PI)*(radius/EARTH_RADIUS)*(1/Math.cos(latitude));
-        return lngDelta;
+
+    public int chooseNumberSupplyAlert(){
+        final MySeekBar barNumber1 = new MySeekBar(this);
+        barNumber1.setMax(getResources().getInteger(R.integer.pref_supply_max_seats_in_car)-1);
+        barNumber1.setProgress(seats_in_car-1);
+
+
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.alert_dialog_num_seats_supply_title)
+                .setMessage(R.string.alert_dialog_num_seats_supply_message)
+                .setView(barNumber1)
+                .setPositiveButton(R.string.alert_dialog_ok, new DialogInterface.OnClickListener() {
+                    public void onClick(DialogInterface dialog, int whichButton) {
+                        seats_in_car = (barNumber1.getProgress()+1);
+
+                        SharedPreferences.Editor editor = sharedPref.edit();
+                        editor.putInt(getString(R.string.pref_supply_seats_in_car), seats_in_car);
+                        editor.apply();
+                    }
+                })
+                .setCancelable(false)
+                .show();
+
+        return seats_in_car;
+    }
+
+    public boolean removeSupplyFromFireBase(){
+        if(location==null){
+            Toast.makeText(getApplicationContext(), "Enable location or wait for location fix",
+                    Toast.LENGTH_SHORT).show();
+            return false;
+        }
+        if(currentUser==null){
+            Toast.makeText(getApplicationContext(), "You are not logged in\nLog in please",
+                    Toast.LENGTH_SHORT).show();
+            return false;
+        }
+        refSupply.child(facebookUserId).removeValue();
+        //geoFireSupply.removeLocation(facebookUserId); ////For Test comment
+        return true;
+    }
+
+    public boolean addDemandToFireBase(){
+        Log.d(TAG, "addDemandToFireBase" );
+        if(location==null){
+            Toast.makeText(getApplicationContext(), "Enable location or wait for location fix",
+                    Toast.LENGTH_SHORT).show();
+            return false;
+        }
+        if(currentUser==null){
+            Toast.makeText(getApplicationContext(), "You are not logged in\nLog in please",
+                    Toast.LENGTH_SHORT).show();
+            return false;
+        }
+
+        Long requestingSeats = (long) chooseNumberDemandAlert();
+        MyDemand myDemand = new MyDemand(requestingSeats);
+        refDemand.child(facebookUserId).setValue(myDemand);
+        geoFireDemand.setLocation(facebookUserId, new GeoLocation(latitude, longitude));
+        return true;
+    }
+
+    public int chooseNumberDemandAlert(){
+        final MySeekBar barNumber2 = new MySeekBar(this);
+        barNumber2.setMax(getResources().getInteger(R.integer.pref_supply_max_seats_in_car)-1);
+        barNumber2.setProgress(demand_seats-1);
+
+
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.alert_dialog_num_seats_demand_title)
+                .setMessage(R.string.alert_dialog_num_seats_demand_message)
+                .setView(barNumber2)
+                .setPositiveButton(R.string.alert_dialog_ok, new DialogInterface.OnClickListener() {
+                    public void onClick(DialogInterface dialog, int whichButton) {
+                        demand_seats = (barNumber2.getProgress()+1);
+
+                        SharedPreferences.Editor editor = sharedPref.edit();
+                        editor.putInt(getString(R.string.pref_demand_seats_in_car), demand_seats);
+                        editor.apply();
+                    }
+                })
+                .setCancelable(false)
+                .show();
+        return demand_seats;
+    }
+
+    public boolean removeDemandFromFireBase(){
+        if(location==null){
+            Toast.makeText(getApplicationContext(), "Enable location or wait for location fix",
+                    Toast.LENGTH_SHORT).show();
+            return false;
+        }
+        if(currentUser==null){
+            Toast.makeText(getApplicationContext(), "You are not logged in\nLog in please",
+                    Toast.LENGTH_SHORT).show();
+            return false;
+        }
+        refDemand.child(facebookUserId).removeValue();
+        geoFireDemand.removeLocation(facebookUserId);
+        return true;
+    }
+
+    public void addHistoryToFireBase(){
+        //TEST HISTORY
+        String supplyUserId = facebookUserId;
+        Long offeredSeats = new Long(seats_in_car);
+        Long usedSeats = new Long(seats_in_car-demand_seats);
+        Map<String, Long> demandUserId = new HashMap<>();
+        demandUserId.put("Gil", Long.valueOf(1));
+        demandUserId.put("Rivka", Long.valueOf(1));
+        demandUserId.put("Pavel", Long.valueOf(2));
+        demandUserId.put("Moscalej", Long.valueOf(2));
+
+        globalHistory.setGlobalHistory(refHistory.push().getKey(),
+                new GeoLocation(latitude, longitude), new GeoLocation(latitude, longitude),
+                supplyUserId, demandUserId, offeredSeats,usedSeats);
+    }
+
+    public void findRideFromFireBase(){
+        Log.d(TAG, "FIND :");
+        // Read from the database
+        // creates a new query around [37.7832, -122.4056] with a radius of 0.6 kilometers
+        GeoQuery geoQuery = geoFireSupply.queryAtLocation(new GeoLocation(latitude,longitude), radius);
+        geoQuery.addGeoQueryEventListener(new GeoQueryEventListener() {
+            @Override
+            public void onKeyEntered(String key, GeoLocation location) {
+                Log.d(TAG, "FIND : "+String.format("Key %s entered the search area at [%f,%f]", key, location.latitude, location.longitude));
+            }
+
+            @Override
+            public void onKeyExited(String key) {
+                Log.d(TAG, "FIND : "+String.format("Key %s is no longer in the search area", key));
+            }
+
+            @Override
+            public void onKeyMoved(String key, GeoLocation location) {
+                Log.d(TAG, "FIND : "+String.format("Key %s moved within the search area to [%f,%f]", key, location.latitude, location.longitude));
+            }
+
+            @Override
+            public void onGeoQueryReady() {
+                Log.d(TAG, "FIND : "+"All initial data has been loaded and events have been fired!");
+            }
+
+            @Override
+            public void onGeoQueryError(DatabaseError error) {
+                Log.d(TAG, "FIND : "+"There was an error with this query: " + error);
+            }
+        });
+        //geoQuery.removeAllListeners();
+        //Updating the query criteria: The GeoQuery search area can be changed with setCenter and setRadius
+        //You can call either removeGeoQueryEventListener to remove a single event listener or removeAllListeners to remove all event listeners for a GeoQuery
+
     }
 
     //FOR TESTING
     public double randomLatGen(){
-        double min = 32.701475;
-        double max = 32.826854;
-        double random = ThreadLocalRandom.current().nextDouble(min, max);
-        return random;
+        double min = latitude-approxLatDelta();
+        double max = latitude+approxLatDelta();
+        return ThreadLocalRandom.current().nextDouble(min, max);
     }
-    public double randomLonGen(){
-        double min = 34.984293;
-        double max = 35.131003;
-        double random = ThreadLocalRandom.current().nextDouble(min, max);
-        return random;
+    public double randomLngGen(){
+        double min = longitude-approxLngDelta();
+        double max = longitude+approxLngDelta();
+        return ThreadLocalRandom.current().nextDouble(min, max);
     }
-
-    /*
-        //TEST LIST
-        DatabaseReference myRefList = myDataBaseRef.child("list/");
-        List<String> myList = new ArrayList<String>();
-        myList.add("un");
-        myList.add("deux");
-        myList.add("trois");
-        myRefList.push().setValue(myList);
-
-        //TEST MAP
-        DatabaseReference myRefMap = myDataBaseRef.child("map/");
-        Map<String, Boolean> myMap = new HashMap<>();
-        myMap.put("un", true);
-        myMap.put("deux", true);
-        myMap.put("trois", true);
-        myRefMap.push().setValue(myMap);
-        */
-
+    private double approxLatDelta(){
+        double dist = radius*1000; //radius is in km and we need it in m
+        return (180/Math.PI)*(dist/EARTH_RADIUS);
+    }
+    private double approxLngDelta(){
+        double dist = radius*1000; //radius is in km and we need it in m
+        return (180/Math.PI)*(dist/EARTH_RADIUS)*(1/Math.cos(latitude));
+    }
 }
