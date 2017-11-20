@@ -14,6 +14,7 @@ import android.location.LocationProvider;
 import android.os.Bundle;
 import android.os.IBinder;
 import android.provider.Settings;
+import android.support.v4.content.LocalBroadcastManager;
 import android.util.Log;
 import android.widget.Toast;
 
@@ -38,16 +39,16 @@ public class LocationService extends Service {
     private MyLocationListener listener = new MyLocationListener();
 
     // The minimum distance to change updates, in meters
-    private static final float MIN_DISTANCE = 10; // 10 meters
+    private static final float MIN_DISTANCE = 1; // 1 meters
     // The minimum time between updates from a provider, in milliseconds
-    private static final long MIN_TIME = 1000 * 20 * 1; // 20 sec (ms * s * h)
+    private static final long MIN_TIME = 1000 * 2 * 1; // 2 sec (ms * s * h)
     // The maximum time between updates for the location, in milliseconds
-    private static final int TWO_MINUTES = 1000 * 6 * 1;
+    private static final int TWO_MINUTES = 1000 * 60 * 2;
 
-    private class MyLocationListener implements LocationListener{
+    class MyLocationListener implements LocationListener{
         Location listLoc;
 
-        public MyLocationListener()
+        MyLocationListener()
         {
             Log.d(TAG, "LocationListener" );
             listLoc = null;
@@ -122,6 +123,7 @@ public class LocationService extends Service {
             case gpsProvider:
                 return 2;
             default:
+                Log.wtf(TAG, "Not normal! Error pToI(String provider)");
                 return -1; //Should not arrive here
         }
     }

@@ -66,10 +66,6 @@
             android:enabled="true"
             android:exported="false"></service>
         <!-- RECEIVER -->
-        <receiver
-            android:name=".LocationReceiver"
-            android:enabled="true"
-            android:exported="false" />
 
     </application>
 
