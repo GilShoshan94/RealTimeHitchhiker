@@ -217,6 +217,8 @@ public class MainActivity extends AppCompatActivity {
     protected void onPause() {
         super.onPause();
         Log.d(TAG, "MAIN_onPause" );
+        Intent i_start = new Intent(getApplicationContext(), FirebaseService.class);
+        startService(i_start);
     }
 
     @Override

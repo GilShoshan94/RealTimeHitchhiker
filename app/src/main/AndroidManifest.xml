@@ -64,9 +64,10 @@
         <service
             android:name=".FirebaseService"
             android:enabled="true"
-            android:exported="false"></service>
+            android:exported="false" />
         <!-- RECEIVER -->
 
+        <activity android:name=".ResultActivity"></activity>
     </application>
 
 </manifest>
