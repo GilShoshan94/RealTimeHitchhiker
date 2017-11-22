@@ -64,7 +64,7 @@ public class MainActivity extends AppCompatActivity {
     private static final int RC_SIGN_IN = 123; //FireBase
     public static final double EARTH_RADIUS = 6371008.8; //in meter the mean radius of Earth is 6371008.8 m
     public static final String TAG = "MAIN_DEBUG";
-    private static Integer count=0; // FOR TEST TODO
+    //private static Integer count=0; // FOR TEST TODO
 
     private SharedPreferences sharedPref;
     private int radius; // in meters
@@ -210,14 +210,15 @@ public class MainActivity extends AppCompatActivity {
                     Double latitude = (Double) intent.getExtras().get("geoLocationLatitude");
                     Double longitude = (Double) intent.getExtras().get("geoLocationLongitude");
 
+                    Log.d(FirebaseService.TAG, "broadcastReceiverSupplyFound : "+facebookUserIdFound+" "+latitude+" "+longitude );
                     callResultActivity(facebookUserIdFound, latitude, longitude);
                 }
             };
         }
-
         LocalBroadcastManager localBroadcastManager = LocalBroadcastManager.getInstance(this);
         localBroadcastManager.registerReceiver(broadcastReceiverLocUpdate,new IntentFilter(LocationService.BROADCAST_ACTION_LOC_UPDATE));
         localBroadcastManager.registerReceiver(broadcastReceiverLocOff,new IntentFilter(LocationService.BROADCAST_ACTION_LOC_OFF));
+        localBroadcastManager.registerReceiver(broadcastReceiverSupplyFound,new IntentFilter(FirebaseService.BROADCAST_ACTION_SUPPLY_FOUND));
     }
 
     @Override
@@ -248,6 +249,9 @@ public class MainActivity extends AppCompatActivity {
         }
         if(broadcastReceiverLocOff != null){
             localBroadcastManager.unregisterReceiver(broadcastReceiverLocOff);
+        }
+        if(broadcastReceiverSupplyFound != null){
+            localBroadcastManager.unregisterReceiver(broadcastReceiverSupplyFound);
         }
     }
 
@@ -463,15 +467,15 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    //AND ALSO ENABLE FIREBASE SERVICE
+    //AND ALSO ENABLE FIREBASE SERVICE FIRST !!!
     private void enableLocationService() {
         //Toast.makeText(getApplicationContext(), "Location Service ON",
-        //        Toast.LENGTH_SHORT).show();
+        //
+        Intent i_start_first = new Intent(getApplicationContext(), FirebaseService.class);
+        startService(i_start_first);
+
         Intent i_start = new Intent(getApplicationContext(), LocationService.class);
         startService(i_start);
-
-        Intent i_start2 = new Intent(getApplicationContext(), FirebaseService.class);
-        startService(i_start2);
     }
 
     /**
@@ -682,10 +686,10 @@ public class MainActivity extends AppCompatActivity {
         refSupply.child(facebookUserId).setValue(mySupply);
         //FOR TEST TODO
         Double lat = randomLatGen(), lng = randomLngGen();
-        count++;
-        String index = facebookUserId+(count).toString();
+        //count++;
+        //String index = facebookUserId+(count).toString();
 
-        geoFireSupply.setLocation(index, new GeoLocation(lat, lng)); //For Test use index, normal use facebookUserId;
+        geoFireSupply.setLocation(facebookUserId, new GeoLocation(lat, lng)); //For Test use index, normal use facebookUserId;
         return true;
     }
 
@@ -722,7 +726,7 @@ public class MainActivity extends AppCompatActivity {
         }
         refSupply.child(facebookUserId).removeValue();
         //TODO
-        //geoFireSupply.removeLocation(facebookUserId); ////For Test comment
+        geoFireSupply.removeLocation(facebookUserId); ////For Test comment this
         return true;
     }
 

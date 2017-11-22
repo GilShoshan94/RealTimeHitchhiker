@@ -137,6 +137,7 @@ public class FirebaseService extends Service {
                         Log.d(TAG, "broadcastReceiverLocUpdate");
                         if (demand_true_or_cancel_false){
                             if (geoQuery!=null){
+                                initialization_flag = true;
                                 geoQuery.setCenter(new GeoLocation(latitude,longitude));
                             }
                         }
@@ -160,6 +161,7 @@ public class FirebaseService extends Service {
                     radius = (int)intent.getExtras().get(SettingsActivity.EXTRA_RADIUS_MESSAGE);
                     if (demand_true_or_cancel_false){
                         if (geoQuery!=null){
+                            initialization_flag = true;
                             geoQuery.setRadius(radius);
                         }
                     }
@@ -366,16 +368,13 @@ public class FirebaseService extends Service {
             @Override
             public void onGeoQueryReady() {
                 Log.d(TAG, "FIND : "+"All initial data has been loaded and events have been fired!");
+                initialization_flag = false;
                 if(resultKey.size()>0){
                     if(!on_process){
                         on_process = true;
                         processResult();
                     }
                 }
-                else{
-                    initialization_flag = false;
-                }
-
             }
 
             @Override
@@ -391,7 +390,7 @@ public class FirebaseService extends Service {
 
     private void processResult(){
         if(main_activity_is_on){
-            Log.d(TAG, "processResult activity ON");
+            Log.d(TAG, "processResult activity ON : " + main_activity_is_on);
 
             LocalBroadcastManager localBroadcastManager = LocalBroadcastManager.getInstance(this);
             Intent intent = new Intent(BROADCAST_ACTION_SUPPLY_FOUND);
