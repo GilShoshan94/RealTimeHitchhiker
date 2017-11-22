@@ -11,21 +11,19 @@ import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
 import android.location.Location;
 import android.location.LocationManager;
-import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
 import android.provider.Settings;
 import android.support.annotation.NonNull;
 import android.support.v4.app.ActivityCompat;
+import android.support.v4.content.LocalBroadcastManager;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.ImageView;
-import android.widget.SeekBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -35,9 +33,6 @@ import com.firebase.geofire.GeoFire;
 import com.firebase.geofire.GeoLocation;
 import com.firebase.geofire.GeoQuery;
 import com.firebase.geofire.GeoQueryEventListener;
-import com.firebase.geofire.core.GeoHash;
-import com.firebase.geofire.core.GeoHashQuery;
-import com.firebase.geofire.util.GeoUtils;
 import com.firebase.ui.auth.AuthUI;
 import com.firebase.ui.auth.ErrorCodes;
 import com.firebase.ui.auth.IdpResponse;
@@ -54,10 +49,6 @@ import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.database.Query;
 import com.google.firebase.database.ValueEventListener;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.text.DecimalFormat;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -65,13 +56,15 @@ import java.util.Map;
 import java.util.concurrent.ThreadLocalRandom;
 
 public class MainActivity extends AppCompatActivity {
-    //public static final String EXTRA_MESSAGE = "com.realtimehitchhiker.hitchgo.MESSAGE"; for intent //intent.putExtra(EXTRA_MESSAGE, message); to be unique
+    public static final String BROADCAST_ACTION_MAIN_RESUME = "com.realtimehitchhiker.hitchgo.MAIN_RESUME";
+    public static final String BROADCAST_ACTION_MAIN_PAUSE = "com.realtimehitchhiker.hitchgo.MAIN_PAUSE";
+    public static final String BROADCAST_ACTION_MAIN_REQUEST = "com.realtimehitchhiker.hitchgo.MAIN_REQUEST";
+    public static final String EXTRA_REQUEST_MESSAGE = "com.realtimehitchhiker.hitchgo.DEMAND_TRUE_CANCEL_FALSE";
     private static final int PERMISSION_LOCATION_REQUEST_CODE = 2;
     private static final int RC_SIGN_IN = 123; //FireBase
-    public static final double LAT_MIN = -90.0, LAT_MAX = 90.0, LNG_MIN = -180.0, LNG_MAX = 180.0;
     public static final double EARTH_RADIUS = 6371008.8; //in meter the mean radius of Earth is 6371008.8 m
     public static final String TAG = "MAIN_DEBUG";
-    private static Integer count=0; // FOR TEST
+    private static Integer count=0; // FOR TEST TODO
 
     private SharedPreferences sharedPref;
     private int radius; // in meters
@@ -81,8 +74,6 @@ public class MainActivity extends AppCompatActivity {
     //FireBase
     private FirebaseAuth mAuth;
     private FirebaseUser currentUser;
-    private FirebaseDatabase database;
-    private DatabaseReference myDataBaseRef;
     private DatabaseReference refUsers;
     private DatabaseReference refSupply;
     private DatabaseReference refDemand;
@@ -108,7 +99,7 @@ public class MainActivity extends AppCompatActivity {
     private Button btnDemand;
     private TextView txtShowLocation, txtWelcome;
     private ImageView imProfile;
-    private BroadcastReceiver broadcastReceiverLocUpdate, broadcastReceiverLocOff;
+    private BroadcastReceiver broadcastReceiverLocUpdate, broadcastReceiverLocOff, broadcastReceiverSupplyFound;
     private Location location = null;
     private Double latitude = null;
     private Double longitude = null;
@@ -131,8 +122,8 @@ public class MainActivity extends AppCompatActivity {
         //For FireBase
         mAuth = FirebaseAuth.getInstance();
         currentUser = mAuth.getCurrentUser();
-        database = FirebaseDatabase.getInstance();
-        myDataBaseRef = database.getReference();
+        FirebaseDatabase database = FirebaseDatabase.getInstance();
+        DatabaseReference myDataBaseRef = database.getReference();
         refUsers = myDataBaseRef.child("users/");
         refSupply = myDataBaseRef.child("supply/");
         refDemand = myDataBaseRef.child("demand/");
@@ -141,12 +132,12 @@ public class MainActivity extends AppCompatActivity {
         geoFireDemand = new GeoFire(myDataBaseRef.child("geofire/geofire-demand"));
         globalHistory = new MyGlobalHistory(refHistory);
 
-        txtShowLocation = (TextView) findViewById(R.id.textView_testCoordinates);
-        txtWelcome = (TextView) findViewById(R.id.textView_welcome_profile);
-        btnLog = (Button) findViewById(R.id.button_login);
-        btnSupply = (Button) findViewById(R.id.button_giveRide);
-        btnDemand = (Button) findViewById(R.id.button_findRide);
-        imProfile = (ImageView) findViewById(R.id.profile_image);
+        txtShowLocation = findViewById(R.id.textView_testCoordinates);
+        txtWelcome = findViewById(R.id.textView_welcome_profile);
+        btnLog = findViewById(R.id.button_login);
+        btnSupply = findViewById(R.id.button_giveRide);
+        btnDemand = findViewById(R.id.button_findRide);
+        imProfile = findViewById(R.id.profile_image);
         //imProfile.setMaxHeight(100);
         //imProfile.setMaxWidth(100);
         imProfile.setScaleType(ImageView.ScaleType.CENTER_CROP);
@@ -175,8 +166,9 @@ public class MainActivity extends AppCompatActivity {
         enableDemandButton();
 
         // Check permissions and start service location
-        if(!runtimePermissions())
+        if(!runtimePermissions()) {
             enableLocationService();
+        }
 
     }
 
@@ -184,6 +176,7 @@ public class MainActivity extends AppCompatActivity {
     protected void onResume() {
         super.onResume();
         Log.d(TAG, "MAIN_onResume" );
+        broadcastOnResume();
         if(broadcastReceiverLocUpdate == null){
             broadcastReceiverLocUpdate = new BroadcastReceiver() {
                 @SuppressLint("SetTextI18n")
@@ -209,37 +202,53 @@ public class MainActivity extends AppCompatActivity {
                 }
             };
         }
-        registerReceiver(broadcastReceiverLocUpdate,new IntentFilter(LocationService.BROADCAST_ACTION_LOC_UPDATE));
-        registerReceiver(broadcastReceiverLocOff,new IntentFilter(LocationService.BROADCAST_ACTION_LOC_OFF));
+        if(broadcastReceiverSupplyFound == null) {
+            broadcastReceiverSupplyFound = new BroadcastReceiver() {
+                @Override
+                public void onReceive(Context context, Intent intent) {
+                    String facebookUserIdFound = (String) intent.getExtras().get("facebookUserIdFound");
+                    Double latitude = (Double) intent.getExtras().get("geoLocationLatitude");
+                    Double longitude = (Double) intent.getExtras().get("geoLocationLongitude");
+
+                    callResultActivity(facebookUserIdFound, latitude, longitude);
+                }
+            };
+        }
+
+        LocalBroadcastManager localBroadcastManager = LocalBroadcastManager.getInstance(this);
+        localBroadcastManager.registerReceiver(broadcastReceiverLocUpdate,new IntentFilter(LocationService.BROADCAST_ACTION_LOC_UPDATE));
+        localBroadcastManager.registerReceiver(broadcastReceiverLocOff,new IntentFilter(LocationService.BROADCAST_ACTION_LOC_OFF));
     }
 
     @Override
     protected void onPause() {
         super.onPause();
         Log.d(TAG, "MAIN_onPause" );
-        Intent i_start = new Intent(getApplicationContext(), FirebaseService.class);
-        startService(i_start);
+        broadcastOnPause();
     }
 
     @Override
     protected void onStop() {
         super.onStop();
         Log.d(TAG, "MAIN_onStop" );
+        if(!flag_demand && !flag_supply){
+            //Stop FirebaseService (and FirebaseService will stop LocationService in is onDestroy method)
+            Intent i_stop = new Intent(getApplicationContext(), FirebaseService.class);
+            stopService(i_stop);
+        }
     }
 
     @Override
     protected void onDestroy() {
         super.onDestroy();
         Log.d(TAG, "MAIN_onDestroy" );
+        LocalBroadcastManager localBroadcastManager = LocalBroadcastManager.getInstance(this);
         if(broadcastReceiverLocUpdate != null){
-            unregisterReceiver(broadcastReceiverLocUpdate);
+            localBroadcastManager.unregisterReceiver(broadcastReceiverLocUpdate);
         }
         if(broadcastReceiverLocOff != null){
-            unregisterReceiver(broadcastReceiverLocOff);
+            localBroadcastManager.unregisterReceiver(broadcastReceiverLocOff);
         }
-
-        Intent i_stop = new Intent(getApplicationContext(), LocationService.class);
-        stopService(i_stop);
     }
 
     @Override
@@ -426,7 +435,8 @@ public class MainActivity extends AppCompatActivity {
     private void updateUI(FirebaseUser user){
         if(user!=null){
             //already signed in
-            txtWelcome.setText("Welcome back " + user.getDisplayName());
+            txtWelcome.setText(R.string.ui_welcome_logged_in);
+            txtWelcome.append(" " + user.getDisplayName());
             enableLogButton(true);
             // find the Facebook profile and get the user's id
             for(UserInfo profile : currentUser.getProviderData()) {
@@ -438,56 +448,30 @@ public class MainActivity extends AppCompatActivity {
             // construct the URL to the profile picture, with a custom height
             // alternatively, use '?type=small|medium|large' instead of ?height=500
             photoUrl = "https://graph.facebook.com/" + facebookUserId + "/picture?type=large";
-            new DownloadImageTask(imProfile).execute(photoUrl);
+            //new DownloadImageTask(imProfile).execute(photoUrl);
+            new DownloadImageTask(new DownloadImageTask.AsyncResponse() {
+                @Override
+                public void processFinish(Bitmap output) {
+                    imProfile.setImageBitmap(output);
+                }
+            }).execute(photoUrl);
         }
         else{
             enableLogButton(false);
-            txtWelcome.setText("Welcome, please log in");
+            txtWelcome.setText(R.string.ui_welcome_logged_in);
             imProfile.setImageResource(R.drawable.com_facebook_profile_picture_blank_square);
         }
     }
 
-    private class DownloadImageTask extends AsyncTask<String, Void, Bitmap> {
-        ImageView bmImage;
-
-        public DownloadImageTask(ImageView bmImage) {
-            this.bmImage = bmImage;
-        }
-
-        protected Bitmap doInBackground(String... urls) {
-            String urlDisplay = urls[0];
-            Bitmap mIcon = null;
-            InputStream in = null;
-            try {
-                in = new java.net.URL(urlDisplay).openStream();
-                mIcon = BitmapFactory.decodeStream(in);
-            } catch (Exception e) {
-                Log.e("Error", e.getMessage());
-                e.printStackTrace();
-            } finally {
-                if (in != null) {
-                    try {
-                        in.close();
-                    }
-                    catch(IOException ioEx) {
-                        //Very bad things just happened... handle it
-                        Log.wtf(TAG, "Stream.close throw exception :" + ioEx );
-                    }
-                }
-            }
-            return mIcon;
-        }
-
-        protected void onPostExecute(Bitmap result) {
-            bmImage.setImageBitmap(result);
-        }
-    }
-
+    //AND ALSO ENABLE FIREBASE SERVICE
     private void enableLocationService() {
-        Toast.makeText(getApplicationContext(), "Location Service ON",
-                Toast.LENGTH_SHORT).show();
+        //Toast.makeText(getApplicationContext(), "Location Service ON",
+        //        Toast.LENGTH_SHORT).show();
         Intent i_start = new Intent(getApplicationContext(), LocationService.class);
         startService(i_start);
+
+        Intent i_start2 = new Intent(getApplicationContext(), FirebaseService.class);
+        startService(i_start2);
     }
 
     /**
@@ -591,6 +575,14 @@ public class MainActivity extends AppCompatActivity {
         startActivity(intent);
     }
 
+    public void callResultActivity(String facebookUserIdFound, Double latitude, Double longitude) {
+        Intent resultIntent = new Intent(this, ResultActivity.class);
+        resultIntent.putExtra("facebookUserIdFound", facebookUserIdFound);
+        resultIntent.putExtra("geoLocationLatitude", latitude);
+        resultIntent.putExtra("geoLocationLongitude", longitude);
+        startActivity(resultIntent);
+    }
+
     public void addUserIfNewInFireBase() {
         Log.d(TAG, "addUserIfNewInFireBase" );
         if(facebookUserId==null){
@@ -686,10 +678,9 @@ public class MainActivity extends AppCompatActivity {
             return false;
         }
 
-        Long remainingSeats = (long) chooseNumberSupplyAlert();
-        MySupply mySupply = new MySupply(remainingSeats);
+        MySupply mySupply = new MySupply((long) chooseNumberSupplyAlert());
         refSupply.child(facebookUserId).setValue(mySupply);
-        //FOR TEST
+        //FOR TEST TODO
         Double lat = randomLatGen(), lng = randomLngGen();
         count++;
         String index = facebookUserId+(count).toString();
@@ -724,17 +715,13 @@ public class MainActivity extends AppCompatActivity {
     }
 
     public boolean removeSupplyFromFireBase(){
-        if(location==null){
-            Toast.makeText(getApplicationContext(), "Enable location or wait for location fix",
-                    Toast.LENGTH_SHORT).show();
-            return false;
-        }
         if(currentUser==null){
             Toast.makeText(getApplicationContext(), "You are not logged in\nLog in please",
                     Toast.LENGTH_SHORT).show();
             return false;
         }
         refSupply.child(facebookUserId).removeValue();
+        //TODO
         //geoFireSupply.removeLocation(facebookUserId); ////For Test comment
         return true;
     }
@@ -752,10 +739,10 @@ public class MainActivity extends AppCompatActivity {
             return false;
         }
 
-        Long requestingSeats = (long) chooseNumberDemandAlert();
-        MyDemand myDemand = new MyDemand(requestingSeats);
+        MyDemand myDemand = new MyDemand((long) chooseNumberDemandAlert());
         refDemand.child(facebookUserId).setValue(myDemand);
         geoFireDemand.setLocation(facebookUserId, new GeoLocation(latitude, longitude));
+        broadcastRequest(true);
         return true;
     }
 
@@ -784,11 +771,6 @@ public class MainActivity extends AppCompatActivity {
     }
 
     public boolean removeDemandFromFireBase(){
-        if(location==null){
-            Toast.makeText(getApplicationContext(), "Enable location or wait for location fix",
-                    Toast.LENGTH_SHORT).show();
-            return false;
-        }
         if(currentUser==null){
             Toast.makeText(getApplicationContext(), "You are not logged in\nLog in please",
                     Toast.LENGTH_SHORT).show();
@@ -796,9 +778,30 @@ public class MainActivity extends AppCompatActivity {
         }
         refDemand.child(facebookUserId).removeValue();
         geoFireDemand.removeLocation(facebookUserId);
+        broadcastRequest(false);
         return true;
     }
 
+    private void broadcastOnResume(){
+        LocalBroadcastManager localBroadcastManager = LocalBroadcastManager.getInstance(this);
+        Intent intent = new Intent(BROADCAST_ACTION_MAIN_RESUME);
+        localBroadcastManager.sendBroadcast(intent);
+    }
+
+    private void broadcastOnPause(){
+        LocalBroadcastManager localBroadcastManager = LocalBroadcastManager.getInstance(this);
+        Intent intent = new Intent(BROADCAST_ACTION_MAIN_PAUSE);
+        localBroadcastManager.sendBroadcast(intent);
+    }
+
+    private void broadcastRequest(boolean demand_true_or_cancel_false){
+        LocalBroadcastManager localBroadcastManager = LocalBroadcastManager.getInstance(this);
+        Intent intent = new Intent(BROADCAST_ACTION_MAIN_REQUEST);
+        intent.putExtra(EXTRA_REQUEST_MESSAGE, demand_true_or_cancel_false);
+        localBroadcastManager.sendBroadcast(intent);
+    }
+
+    /*
     public void addHistoryToFireBase(){
         //TEST HISTORY
         String supplyUserId = facebookUserId;
@@ -814,7 +817,9 @@ public class MainActivity extends AppCompatActivity {
                 new GeoLocation(latitude, longitude), new GeoLocation(latitude, longitude),
                 supplyUserId, demandUserId, offeredSeats,usedSeats);
     }
+    */
 
+    /*
     public void findRideFromFireBase(){
         Log.d(TAG, "FIND :");
         // Read from the database
@@ -851,6 +856,7 @@ public class MainActivity extends AppCompatActivity {
         //You can call either removeGeoQueryEventListener to remove a single event listener or removeAllListeners to remove all event listeners for a GeoQuery
 
     }
+    */
 
     //FOR TESTING
     public double randomLatGen(){

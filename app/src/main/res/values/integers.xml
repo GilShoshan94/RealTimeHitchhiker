@@ -1,7 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- General Settings -->
     <integer name="pref_radius_min">1</integer>
     <integer name="pref_radius_max">10</integer>
     <integer name="pref_supply_max_seats_in_car">4</integer>
+    <integer name="pref_max_supply_found">10</integer>
+
+
+    <!-- Notification ID -->
     <integer name="notification_id">1</integer>
 </resources>
