@@ -51,11 +51,11 @@ import java.util.*;
 public class MyGlobalHistory {
 
     private String supplyUserId;
-    private Map<String, Long> demandUserId;
+    private Map<String, String> demandUserId;
     private Long timeStamp;
     private String date;
-    private Long offeredSeats;
-    private Long unusedSeats;
+    private String offeredSeats;
+    private String usedSeats;
     private GeoLocation fromLocation;
     private GeoLocation toLocation;
     private final DatabaseReference databaseReference;
@@ -138,17 +138,17 @@ public class MyGlobalHistory {
         this.databaseReference = databaseReference;
     }
 
-    public MyGlobalHistory(String key, GeoLocation fromLocation,
+    public MyGlobalHistory(GeoLocation fromLocation,
                            GeoLocation toLocation, String supplyUserId,
-                           Map<String, Long> demandUserId,
-                           Long offeredSeats, Long usedSeats, DatabaseReference databaseReference) {
+                           Map<String, String> demandUserId,
+                           String offeredSeats, String usedSeats, DatabaseReference databaseReference) {
         this.supplyUserId = supplyUserId;
         this.demandUserId = demandUserId;
         timeStamp = System.currentTimeMillis();
         SimpleDateFormat sfd = new SimpleDateFormat("yyyy-MM-dd 'at' HH:mm:ss.SSS z", Locale.US);
         date = sfd.format(new Date(timeStamp));
         this.offeredSeats = offeredSeats;
-        this.unusedSeats = unusedSeats;
+        this.usedSeats = usedSeats;
         this.fromLocation = fromLocation;
         this.toLocation = toLocation;
         this.databaseReference = databaseReference;
@@ -179,8 +179,8 @@ public class MyGlobalHistory {
     //setLocation
     public void setGlobalHistory(String key, GeoLocation fromLocation,
                                  GeoLocation toLocation, String supplyUserId,
-                                 Map<String, Long> demandUserId,
-                                 Long offeredSeats, Long usedSeats) {
+                                 Map<String, String> demandUserId,
+                                 String offeredSeats, String usedSeats) {
         this.setGlobalHistory(key, fromLocation, toLocation, supplyUserId,
                 demandUserId, offeredSeats, usedSeats,null);
     }
@@ -201,8 +201,8 @@ public class MyGlobalHistory {
     //setLocation
     public void setGlobalHistory(final String key, final GeoLocation fromLocation,
                                  final GeoLocation toLocation, final String supplyUserId,
-                                 final Map<String, Long> demandUserId,
-                                 final Long offeredSeats, final Long usedSeats,
+                                 final Map<String, String> demandUserId,
+                                 final String offeredSeats, final String usedSeats,
                                  final CompletionListener completionListener) {
         if (key == null) {
             throw new NullPointerException();
@@ -218,7 +218,7 @@ public class MyGlobalHistory {
         updates.put("l-origin", Arrays.asList(fromLocation.latitude, fromLocation.longitude));
         updates.put("supplyUserId", supplyUserId);
         updates.put("offeredSeats", offeredSeats);
-        updates.put("unusedSeats", (offeredSeats-usedSeats));
+        updates.put("usedSeats", usedSeats);
         updates.put("demandUserId", demandUserId); //XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXxx
         if (completionListener != null) {
             keyRef.setValue(updates, new DatabaseReference.CompletionListener() {

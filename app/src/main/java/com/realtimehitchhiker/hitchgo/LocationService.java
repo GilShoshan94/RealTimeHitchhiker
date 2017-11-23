@@ -1,26 +1,21 @@
 package com.realtimehitchhiker.hitchgo;
 
 import android.annotation.SuppressLint;
-import android.app.AlertDialog;
 import android.app.Service;
 import android.content.Context;
-import android.content.DialogInterface;
 import android.content.Intent;
 import android.location.Criteria;
 import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
-import android.location.LocationProvider;
 import android.os.Bundle;
 import android.os.IBinder;
-import android.provider.Settings;
 import android.support.v4.content.LocalBroadcastManager;
 import android.util.Log;
-import android.widget.Toast;
 
+import static android.location.LocationProvider.AVAILABLE;
 import static android.location.LocationProvider.OUT_OF_SERVICE;
 import static android.location.LocationProvider.TEMPORARILY_UNAVAILABLE;
-import static android.location.LocationProvider.AVAILABLE;
 
 public class LocationService extends Service {
 
@@ -94,9 +89,9 @@ public class LocationService extends Service {
             }
             else if (isLastActiveProvider(provider)){
                 Log.d(TAG, "onProviderDisabled else if " + provider + " ---- " + lastActiveProvider );
-                for (int i = 0; i < activeProviderList.length; i++) {
-                    if (mLocationManager.isProviderEnabled(activeProviderList[i]))
-                        lastActiveProvider = activeProviderList[i];
+                for (String anActiveProviderList : activeProviderList) {
+                    if (mLocationManager.isProviderEnabled(anActiveProviderList))
+                        lastActiveProvider = anActiveProviderList;
                 }
                 Log.d(TAG, "lastActiveProvider = " + lastActiveProvider );
             }
@@ -104,10 +99,7 @@ public class LocationService extends Service {
     }
 
     private boolean isLastActiveProvider(String provider){
-        if (pToI(provider)==pToI(lastActiveProvider))
-            return true;
-        else
-            return false;
+        return pToI(provider) == pToI(lastActiveProvider);
     }
 
     /** Helper function
@@ -130,25 +122,24 @@ public class LocationService extends Service {
 
     private boolean isAllActiveProviderDisabled(){
         int tot=0;
-        for (int i = 0; i < activeProviderList.length; i++) {
-            if (!mLocationManager.isProviderEnabled(activeProviderList[i]))
+        for (String anActiveProviderList : activeProviderList) {
+            if (!mLocationManager.isProviderEnabled(anActiveProviderList))
                 tot++;
         }
-        if (tot == activeProviderList.length)
-            return true;
-        else
-            return false;
+        return tot == activeProviderList.length;
     }
 
     private void broadcastMyLocation(){
+        LocalBroadcastManager localBroadcastManager = LocalBroadcastManager.getInstance(this);
         Intent intent = new Intent(BROADCAST_ACTION_LOC_UPDATE);
         intent.putExtra("location", myLastLocation);
-        sendBroadcast(intent);
+        localBroadcastManager.sendBroadcast(intent);
     }
 
     private void broadcastLocOff(){
-        Intent intentlocoff = new Intent(BROADCAST_ACTION_LOC_OFF);
-        sendBroadcast(intentlocoff);
+        LocalBroadcastManager localBroadcastManager = LocalBroadcastManager.getInstance(this);
+        Intent intentOff = new Intent(BROADCAST_ACTION_LOC_OFF);
+        localBroadcastManager.sendBroadcast(intentOff);
     }
 
     //public LocationService() {

@@ -64,7 +64,6 @@ public class MainActivity extends AppCompatActivity {
     private static final int RC_SIGN_IN = 123; //FireBase
     public static final double EARTH_RADIUS = 6371008.8; //in meter the mean radius of Earth is 6371008.8 m
     public static final String TAG = "MAIN_DEBUG";
-    //private static Integer count=0; // FOR TEST TODO
 
     private SharedPreferences sharedPref;
     private int radius; // in meters
@@ -682,18 +681,12 @@ public class MainActivity extends AppCompatActivity {
             return false;
         }
 
-        MySupply mySupply = new MySupply((long) chooseNumberSupplyAlert());
-        refSupply.child(facebookUserId).setValue(mySupply);
-        //FOR TEST TODO
-        Double lat = randomLatGen(), lng = randomLngGen();
-        //count++;
-        //String index = facebookUserId+(count).toString();
+        chooseNumberSupplyAlert();
 
-        geoFireSupply.setLocation(facebookUserId, new GeoLocation(lat, lng)); //For Test use index, normal use facebookUserId;
         return true;
     }
 
-    public int chooseNumberSupplyAlert(){
+    public void chooseNumberSupplyAlert(){
         final MySeekBar barNumber1 = new MySeekBar(this);
         barNumber1.setMax(getResources().getInteger(R.integer.pref_supply_max_seats_in_car)-1);
         barNumber1.setProgress(seats_in_car-1);
@@ -710,12 +703,18 @@ public class MainActivity extends AppCompatActivity {
                         SharedPreferences.Editor editor = sharedPref.edit();
                         editor.putInt(getString(R.string.pref_supply_seats_in_car), seats_in_car);
                         editor.apply();
+
+                        MySupply mySupply = new MySupply(String.valueOf(seats_in_car));
+                        refSupply.child(facebookUserId).setValue(mySupply);
+                        //FOR TEST TODO change random with the real location
+                        Double lat = randomLatGen(), lng = randomLngGen();
+                        geoFireSupply.setLocation(facebookUserId, new GeoLocation(lat, lng));
+
                     }
                 })
                 .setCancelable(false)
                 .show();
 
-        return seats_in_car;
     }
 
     public boolean removeSupplyFromFireBase(){
@@ -725,8 +724,7 @@ public class MainActivity extends AppCompatActivity {
             return false;
         }
         refSupply.child(facebookUserId).removeValue();
-        //TODO
-        geoFireSupply.removeLocation(facebookUserId); ////For Test comment this
+        geoFireSupply.removeLocation(facebookUserId);
         return true;
     }
 
@@ -743,14 +741,11 @@ public class MainActivity extends AppCompatActivity {
             return false;
         }
 
-        MyDemand myDemand = new MyDemand((long) chooseNumberDemandAlert());
-        refDemand.child(facebookUserId).setValue(myDemand);
-        geoFireDemand.setLocation(facebookUserId, new GeoLocation(latitude, longitude));
-        broadcastRequest(true);
+        chooseNumberDemandAlert();
         return true;
     }
 
-    public int chooseNumberDemandAlert(){
+    public void chooseNumberDemandAlert(){
         final MySeekBar barNumber2 = new MySeekBar(this);
         barNumber2.setMax(getResources().getInteger(R.integer.pref_supply_max_seats_in_car)-1);
         barNumber2.setProgress(demand_seats-1);
@@ -767,11 +762,15 @@ public class MainActivity extends AppCompatActivity {
                         SharedPreferences.Editor editor = sharedPref.edit();
                         editor.putInt(getString(R.string.pref_demand_seats_in_car), demand_seats);
                         editor.apply();
+
+                        MyDemand myDemand = new MyDemand(String.valueOf(demand_seats));
+                        refDemand.child(facebookUserId).setValue(myDemand);
+                        geoFireDemand.setLocation(facebookUserId, new GeoLocation(latitude, longitude));
+                        broadcastRequest(true);
                     }
                 })
                 .setCancelable(false)
                 .show();
-        return demand_seats;
     }
 
     public boolean removeDemandFromFireBase(){

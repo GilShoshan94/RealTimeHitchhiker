@@ -1,13 +1,17 @@
 package com.realtimehitchhiker.hitchgo;
 
 import android.content.Context;
+import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Bundle;
+import android.support.v4.content.LocalBroadcastManager;
 import android.support.v7.app.AppCompatActivity;
 import android.widget.SeekBar;
 import android.widget.TextView;
 
 public class SettingsActivity extends AppCompatActivity {
+    public static final String BROADCAST_ACTION_RADIUS_UPDATE = "com.realtimehitchhiker.hitchgo.RADIUS_UPDATE";
+    public static final String EXTRA_RADIUS_MESSAGE = "com.realtimehitchhiker.hitchgo.EXTRA_RADIUS_MESSAGE";
 
     private SharedPreferences sharedPref;
     private TextView txtShowRadius;
@@ -62,5 +66,18 @@ public class SettingsActivity extends AppCompatActivity {
 
             }
         });
+    }
+
+    @Override
+    protected void onStop() {
+        super.onStop();
+        broadcastRadiusUpdate();
+    }
+
+    private void broadcastRadiusUpdate(){
+        LocalBroadcastManager localBroadcastManager = LocalBroadcastManager.getInstance(this);
+        Intent intent = new Intent(BROADCAST_ACTION_RADIUS_UPDATE);
+        intent.putExtra(EXTRA_RADIUS_MESSAGE, radius);
+        localBroadcastManager.sendBroadcast(intent);
     }
 }

@@ -5,14 +5,14 @@ package com.realtimehitchhiker.hitchgo;
  */
 
 class MySupply {
-    public Long remainingSeats;
+    public String remainingSeats;
     public Long timeStamp;
 
     public MySupply() {
         // Default constructor required for calls to DataSnapshot.getValue(User.class)
     }
 
-    MySupply(Long remainingSeats) {
+    MySupply(String remainingSeats) {
         this.remainingSeats = remainingSeats;
         timeStamp = System.currentTimeMillis();
     }
