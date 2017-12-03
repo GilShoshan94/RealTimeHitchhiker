@@ -39,7 +39,7 @@ public class SettingsActivity extends AppCompatActivity {
         barRadius = (SeekBar) findViewById(R.id.seekBar_prefs_radius);
 
         txtShowRadius.setText(String.valueOf(radius));
-        txtShowRadius.append(" " + getString(R.string.pref_radius_unit));
+        txtShowRadius.append(" " + getString(R.string.settings_radius_unit));
 
         barRadius.setMax(maximum - minimum);
         barRadius.setProgress((radius - minimum));
@@ -49,7 +49,7 @@ public class SettingsActivity extends AppCompatActivity {
             public void onProgressChanged(SeekBar seekBar, int i, boolean b) {
                 radius = (barRadius.getProgress() + minimum);
                 txtShowRadius.setText(String.valueOf(radius));
-                txtShowRadius.append(" " + getString(R.string.pref_radius_unit));
+                txtShowRadius.append(" " + getString(R.string.settings_radius_unit));
 
                 SharedPreferences.Editor editor = sharedPref.edit();
                 editor.putInt(getString(R.string.pref_radius), radius);

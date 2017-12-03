@@ -13,6 +13,11 @@ import java.io.InputStream;
  * Created by gilshoshan on 22-Nov-17.
  */
 
+/**
+ * This class is an helper tool to Download an Image, and does this Task asynchronously
+ *
+ */
+
 class DownloadImageTask extends AsyncTask<String, Void, Bitmap> {
 
     private static final String TAG = "DOWNLOAD_IMAGE_TASK_DEBUG";

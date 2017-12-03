@@ -33,7 +33,14 @@ import com.google.firebase.database.FirebaseDatabase;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
+
+/**
+ * This is the Firebase Service class
+ * It connect the app to the Firebase database and listen to change occurring into it
+ * It also perfoms various query to extract the relevant information needed
+ * It provides to the app the facebookUserIdFound and the location of the Supply found
+ * It communicate through only one broadcast : BROADCAST_ACTION_SUPPLY_FOUND
+ */
 
 public class FirebaseService extends Service {
     public static final String BROADCAST_ACTION_SUPPLY_FOUND = "com.realtimehitchhiker.hitchgo.SUPPLY_FOUND";
@@ -201,8 +208,8 @@ public class FirebaseService extends Service {
         }
 
         LocalBroadcastManager localBroadcastManager = LocalBroadcastManager.getInstance(this);
-        localBroadcastManager.registerReceiver(broadcastReceiverLocUpdate,new IntentFilter(LocationService.BROADCAST_ACTION_LOC_UPDATE));
-        localBroadcastManager.registerReceiver(broadcastReceiverLocOff,new IntentFilter(LocationService.BROADCAST_ACTION_LOC_OFF));
+        localBroadcastManager.registerReceiver(broadcastReceiverLocUpdate,new IntentFilter(LocationService.BROADCAST_ACTION_LOCATION_UPDATE));
+        localBroadcastManager.registerReceiver(broadcastReceiverLocOff,new IntentFilter(LocationService.BROADCAST_ACTION_LOCATION_OFF));
         localBroadcastManager.registerReceiver(broadcastReceiverRadiusUpdate,new IntentFilter(SettingsActivity.BROADCAST_ACTION_RADIUS_UPDATE));
         localBroadcastManager.registerReceiver(broadcastReceiverMainResume,new IntentFilter(MainActivity.BROADCAST_ACTION_MAIN_RESUME));
         localBroadcastManager.registerReceiver(broadcastReceiverMainPause,new IntentFilter(MainActivity.BROADCAST_ACTION_MAIN_PAUSE));

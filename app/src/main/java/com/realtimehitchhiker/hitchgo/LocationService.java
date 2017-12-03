@@ -17,11 +17,19 @@ import static android.location.LocationProvider.AVAILABLE;
 import static android.location.LocationProvider.OUT_OF_SERVICE;
 import static android.location.LocationProvider.TEMPORARILY_UNAVAILABLE;
 
+/**
+ * This is the Location Service class
+ * It provides to the app the location (via the standard android object : Location)
+ * It provides to the app the info of a location provider when it does disabled
+ * It communicate through only two broadcasts : BROADCAST_ACTION_LOCATION_UPDATE
+ *                                              BROADCAST_ACTION_LOCATION_OFF
+ */
+
 public class LocationService extends Service {
 
     @SuppressLint("MissingPermission")
-    public static final String BROADCAST_ACTION_LOC_UPDATE = "com.realtimehitchhiker.hitchgo.LOCATION_UPDATE";
-    public static final String BROADCAST_ACTION_LOC_OFF = "com.realtimehitchhiker.hitchgo.LOCATION_OFF";
+    public static final String BROADCAST_ACTION_LOCATION_UPDATE = "com.realtimehitchhiker.hitchgo.LOCATION_UPDATE";
+    public static final String BROADCAST_ACTION_LOCATION_OFF = "com.realtimehitchhiker.hitchgo.LOCATION_OFF";
     public static final String TAG = "LOCATION";
     private LocationManager mLocationManager = null;
     private Location myLastLocation = null;
@@ -34,11 +42,11 @@ public class LocationService extends Service {
     private MyLocationListener listener = new MyLocationListener();
 
     // The minimum distance to change updates, in meters
-    private static final float MIN_DISTANCE = 1; // 1 meters
+    private final float MIN_DISTANCE = (float) getResources().getInteger(R.integer.location_min_distance);
     // The minimum time between updates from a provider, in milliseconds
-    private static final long MIN_TIME = 1000 * 2 * 1; // 2 sec (ms * s * h)
+    private final long MIN_TIME = (long) getResources().getInteger(R.integer.location_min_time);
     // The maximum time between updates for the location, in milliseconds
-    private static final int TWO_MINUTES = 1000 * 60 * 2;
+    private final int MAXIMUM_TIME = getResources().getInteger(R.integer.location_max_time);
 
     class MyLocationListener implements LocationListener{
         Location listLoc;
@@ -131,14 +139,14 @@ public class LocationService extends Service {
 
     private void broadcastMyLocation(){
         LocalBroadcastManager localBroadcastManager = LocalBroadcastManager.getInstance(this);
-        Intent intent = new Intent(BROADCAST_ACTION_LOC_UPDATE);
+        Intent intent = new Intent(BROADCAST_ACTION_LOCATION_UPDATE);
         intent.putExtra("location", myLastLocation);
         localBroadcastManager.sendBroadcast(intent);
     }
 
     private void broadcastLocOff(){
         LocalBroadcastManager localBroadcastManager = LocalBroadcastManager.getInstance(this);
-        Intent intentOff = new Intent(BROADCAST_ACTION_LOC_OFF);
+        Intent intentOff = new Intent(BROADCAST_ACTION_LOCATION_OFF);
         localBroadcastManager.sendBroadcast(intentOff);
     }
 
@@ -159,8 +167,8 @@ public class LocationService extends Service {
 
         // Check whether the new location fix is newer or older
         long timeDelta = location.getTime() - currentBestLocation.getTime();
-        boolean isSignificantlyNewer = timeDelta > TWO_MINUTES;
-        boolean isSignificantlyOlder = timeDelta < -TWO_MINUTES;
+        boolean isSignificantlyNewer = timeDelta > MAXIMUM_TIME;
+        boolean isSignificantlyOlder = timeDelta < -MAXIMUM_TIME;
         boolean isNewer = timeDelta > 0;
 
         // If it's been more than two minutes since the current location, use the new location
