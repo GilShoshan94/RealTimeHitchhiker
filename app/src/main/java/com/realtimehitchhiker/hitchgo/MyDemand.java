@@ -5,15 +5,19 @@ package com.realtimehitchhiker.hitchgo;
  */
 
 class MyDemand {
-    public String requestingSeats;
+    public String destination;
+    public int requestingSeats;
+    public boolean hasAllowed;
     public Long timeStamp;
 
     public MyDemand() {
         // Default constructor required for calls to DataSnapshot.getValue(User.class)
     }
 
-    MyDemand( String requestingSeats) {
+    MyDemand(String destination, int requestingSeats, boolean hasAllowed) {
+        this.destination = destination;
         this.requestingSeats = requestingSeats;
+        this.hasAllowed = hasAllowed;
         timeStamp = System.currentTimeMillis();
     }
 }

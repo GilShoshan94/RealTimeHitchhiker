@@ -18,8 +18,8 @@ import android.os.Bundle;
 import android.provider.Settings;
 import android.support.annotation.NonNull;
 import android.support.v4.app.ActivityCompat;
+import android.support.v4.app.DialogFragment;
 import android.support.v4.content.LocalBroadcastManager;
-import android.support.v4.widget.TextViewCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.telephony.PhoneNumberFormattingTextWatcher;
 import android.telephony.TelephonyManager;
@@ -29,8 +29,6 @@ import android.text.InputType;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
-import android.widget.CheckBox;
-import android.widget.CheckedTextView;
 import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.TextView;
@@ -39,7 +37,6 @@ import android.widget.Toast;
 import com.facebook.FacebookSdk;
 import com.facebook.appevents.AppEventsLogger;
 import com.firebase.geofire.GeoFire;
-import com.firebase.geofire.GeoLocation;
 import com.firebase.ui.auth.AuthUI;
 import com.firebase.ui.auth.ErrorCodes;
 import com.firebase.ui.auth.IdpResponse;
@@ -941,117 +938,10 @@ public class MainActivity extends AppCompatActivity {
 
 
     //todo comments
-    View dialogSupplyLayout = getLayoutInflater().inflate(R.layout.dialog_supply,null);
-    private EditText txtDestination;
-    private TextView txtFuelPrice;
-    private TextView txtSeatsSupply;
-    CheckBox checkBoxPetSupply;
-    //todo String currency...
-    String currency = "NIS";
-
     public void setSupplyDetails(){
-        //UI initialization of links
-        /*txtDestination = dialogSupplyLayout.findViewById(R.id.editText_destination);
-
-        txtFuelPrice = dialogSupplyLayout.findViewById(R.id.textView_fuel_price);
-        Button btnPlusPrice = dialogSupplyLayout.findViewById(R.id.button_fuel_plus);
-        Button btnMinusPrice = dialogSupplyLayout.findViewById(R.id.button_fuel_minus);
-
-        txtSeatsSupply = dialogSupplyLayout.findViewById(R.id.textView_seats_supply);
-        Button btnPlusSeats = dialogSupplyLayout.findViewById(R.id.button_seats_supply_plus);
-        Button btnMinusSeats = dialogSupplyLayout.findViewById(R.id.button_seats_supply_minus);
-
-        checkBoxPetSupply = dialogSupplyLayout.findViewById(R.id.checkBox_pet_supply);
-
-        //UI set from sharedPreferences
-        final int max_seats = getResources().getInteger(R.integer.pref_supply_max_seats_in_car);
-        final int min_seats = 1;
-        final int max_fuel_price = getResources().getInteger(R.integer.pref_max_fuel_price);
-        final int min_fuel_price = 0;
-
-        txtFuelPrice.setText(R.string.txt_fuel_price); txtFuelPrice.append(" "+fuel_price+" "+ currency);
-        txtSeatsSupply.setText(R.string.txt_seat_supply); txtSeatsSupply.append(" "+seats_in_car);
-        checkBoxPetSupply.setChecked(allow_pet_supply);
-
-        //Set the listeners
-        btnPlusPrice.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                if(fuel_price < max_fuel_price) {
-                    fuel_price++;
-                    txtFuelPrice.setText(R.string.txt_fuel_price);
-                    txtFuelPrice.append(" " + fuel_price + " " + currency);
-                }
-            }
-        });
-        btnMinusPrice.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                if(fuel_price > min_fuel_price) {
-                    fuel_price--;
-                    txtFuelPrice.setText(R.string.txt_fuel_price);
-                    txtFuelPrice.append(" " + fuel_price + " " + currency);
-                }
-            }
-        });
-        btnPlusSeats.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                if(seats_in_car < max_seats) {
-                    seats_in_car++;
-                    txtSeatsSupply.setText(R.string.txt_seat_supply);
-                    txtSeatsSupply.append(" " + seats_in_car);
-                }
-            }
-        });
-        btnMinusSeats.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                if(seats_in_car > min_seats) {
-                    seats_in_car--;
-                    txtSeatsSupply.setText(R.string.txt_seat_supply);
-                    txtSeatsSupply.append(" " + seats_in_car);
-                }
-            }
-        });*/
-
-        new AlertDialog.Builder(this)
-                .setTitle(R.string.alert_dialog_supply_title)
-                .setMessage(R.string.alert_dialog_supply_message)
-                .setView(R.layout.dialog_supply)
-                .setPositiveButton(R.string.alert_dialog_ok, new DialogInterface.OnClickListener() {
-                    public void onClick(DialogInterface dialog, int whichButton) {
-
-                        //allow_pet_supply = checkBoxPetSupply.isChecked();
-                        //String destination = txtDestination.getText().toString();
-
-                        SharedPreferences.Editor editor = sharedPref.edit();
-                        editor.putInt(getString(R.string.pref_supply_seats_in_car), seats_in_car);
-                        editor.putInt(getString(R.string.pref_supply_fuel_price), fuel_price);
-                        editor.putBoolean(getString(R.string.pref_supply_pet), allow_pet_supply);
-                        editor.apply();
-
-                        MySupply mySupply = new MySupply("labas", seats_in_car, fuel_price, allow_pet_supply);
-                        refSupply.child(facebookUserId).setValue(mySupply);
-                        geoFireSupply.setLocation(facebookUserId, new GeoLocation(latitude, longitude));
-
-                    }
-                })
-                .setNegativeButton(R.string.alert_dialog_cancel, new DialogInterface.OnClickListener() {
-                    @Override
-                    public void onClick(DialogInterface dialog, int which) {
-                        //allow_pet_supply = checkBoxPetSupply.isChecked();
-
-                        SharedPreferences.Editor editor = sharedPref.edit();
-                        editor.putInt(getString(R.string.pref_supply_seats_in_car), seats_in_car);
-                        editor.putInt(getString(R.string.pref_supply_fuel_price), fuel_price);
-                        editor.putBoolean(getString(R.string.pref_supply_pet), allow_pet_supply);
-                        editor.apply();
-                    }
-                })
-                .setCancelable(false)
-                .show();
-
+        Log.d(TAG, "setSupplyDetails ");
+        DialogFragment newSupplyFragment = SupplyDialogFragment.newInstance(facebookUserId,latitude,longitude);
+        newSupplyFragment.show(getSupportFragmentManager(), "supplyDialogFragment");
     }
 
     /**
@@ -1084,37 +974,15 @@ public class MainActivity extends AppCompatActivity {
             return false;
         }
 
-        chooseNumberDemandAlert();//todo
+        setDemandDetails();
         return true;
     }
 
-    //todo
-    public void chooseNumberDemandAlert(){
-        final MySeekBar barNumber2 = new MySeekBar(this);
-        barNumber2.setMax(getResources().getInteger(R.integer.pref_supply_max_seats_in_car)-1);
-        barNumber2.setProgress(demand_seats-1);
-
-
-        new AlertDialog.Builder(this)
-                .setTitle(R.string.alert_dialog_demand_title)
-                .setMessage(R.string.alert_dialog_demand_message)
-                .setView(barNumber2)
-                .setPositiveButton(R.string.alert_dialog_ok, new DialogInterface.OnClickListener() {
-                    public void onClick(DialogInterface dialog, int whichButton) {
-                        demand_seats = (barNumber2.getProgress()+1);
-
-                        SharedPreferences.Editor editor = sharedPref.edit();
-                        editor.putInt(getString(R.string.pref_demand_seats_in_car), demand_seats);
-                        editor.apply();
-
-                        MyDemand myDemand = new MyDemand(String.valueOf(demand_seats));
-                        refDemand.child(facebookUserId).setValue(myDemand);
-                        geoFireDemand.setLocation(facebookUserId, new GeoLocation(latitude, longitude));
-                        broadcastRequest(true);
-                    }
-                })
-                .setCancelable(false)
-                .show();
+    //todo comments
+    public void setDemandDetails(){
+        Log.d(TAG, "setDemandDetails ");
+        DialogFragment newDemandFragment = DemandDialogFragment.newInstance(facebookUserId,latitude,longitude);
+        newDemandFragment.show(getSupportFragmentManager(), "supplyDialogFragment");
     }
 
     /**

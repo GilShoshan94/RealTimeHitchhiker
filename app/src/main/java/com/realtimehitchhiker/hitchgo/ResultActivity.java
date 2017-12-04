@@ -128,7 +128,7 @@ public class ResultActivity extends AppCompatActivity {
                     //using for loop because FireBase returns JSON object that are always list.
                     for (DataSnapshot userSnapshot : dataSnapshot.getChildren()) {
                         MyDemand user = userSnapshot.getValue(MyDemand.class); //normally should be only one since unique KeyId
-                        requestingSeats = (user.requestingSeats);
+                        //todo requestingSeats = (user.requestingSeats);
                     }
                 }
                 refDemand.child(facebookUserId).removeValue();
@@ -281,7 +281,7 @@ public class ResultActivity extends AppCompatActivity {
                     //using for loop because FireBase returns JSON object that are always list.
                     for (DataSnapshot userSnapshot : dataSnapshot.getChildren()) {
                         MyDemand user = userSnapshot.getValue(MyDemand.class); //normally should be only one since unique KeyId
-                        requestingSeats = (user.requestingSeats);
+                        //todo requestingSeats = (user.requestingSeats);
                     }
                 }
                 refDemand.child(facebookUserId).removeValue();

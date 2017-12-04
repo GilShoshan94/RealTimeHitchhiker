@@ -8,6 +8,7 @@ class MySupply {
     public String destination;
     public int remainingSeats;
     public int fuelPrice;
+    public String currency;
     public boolean petAllowed;
     public Long timeStamp;
 
@@ -15,10 +16,11 @@ class MySupply {
         // Default constructor required for calls to DataSnapshot.getValue(User.class)
     }
 
-    MySupply(String destination, int remainingSeats, int fuelPrice, boolean petAllowed) {
+    MySupply(String destination, int remainingSeats, int fuelPrice, String currency, boolean petAllowed) {
         this.destination = destination;
         this.remainingSeats = remainingSeats;
         this.fuelPrice = fuelPrice;
+        this.currency = currency;
         this.petAllowed = petAllowed;
         timeStamp = System.currentTimeMillis();
     }

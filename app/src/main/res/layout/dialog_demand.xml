@@ -1,14 +1,76 @@
 <?xml version="1.0" encoding="utf-8"?>
-<android.support.constraint.ConstraintLayout
-    xmlns:android="http://schemas.android.com/apk/res/android"
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
-    android:layout_width="match_parent"
-    android:layout_height="match_parent">
+    android:layout_width="fill_parent"
+    android:layout_height="fill_parent"
+    android:fillViewport="true"> <!--IMPORTANT otherwise backgrnd img. will not fill the whole screen -->
 
-    <Spinner
-        android:id="@+id/spinner"
-        android:layout_width="368dp"
-        android:layout_height="wrap_content"
-        tools:layout_editor_absoluteX="8dp"
-        tools:layout_editor_absoluteY="126dp" />
-</android.support.constraint.ConstraintLayout>
+    <android.support.constraint.ConstraintLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+
+        <EditText
+            android:id="@+id/editText_destination_demand"
+            style="@style/Widget.AppCompat.AutoCompleteTextView"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:ems="10"
+            android:hint="@string/txt_hint_destination"
+            android:inputType="text"
+            android:visibility="visible"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintHorizontal_bias="0.5"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+
+        <TextView
+            android:id="@+id/textView_seats_demand"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="32dp"
+            android:text="@string/txt_seat_demand"
+            android:visibility="visible"
+            app:layout_constraintEnd_toEndOf="@+id/editText_destination_demand"
+            app:layout_constraintStart_toStartOf="@+id/editText_destination_demand"
+            app:layout_constraintTop_toBottomOf="@+id/editText_destination_demand" />
+
+        <CheckBox
+            android:id="@+id/checkBox_pet_demand"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="32dp"
+            android:checked="false"
+            android:minHeight="0dp"
+            android:minWidth="0dp"
+            android:text="@string/check_box_pet_supply"
+            android:visibility="visible"
+            app:layout_constraintEnd_toEndOf="@+id/textView_seats_demand"
+            app:layout_constraintStart_toStartOf="@+id/textView_seats_demand"
+            app:layout_constraintTop_toBottomOf="@+id/textView_seats_demand" />
+
+        <Button
+            android:id="@+id/button_seats_demand_minus"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:minHeight="0dp"
+            android:minWidth="0dp"
+            android:text="@string/button_minus"
+            android:visibility="visible"
+            app:layout_constraintBaseline_toBaselineOf="@+id/textView_seats_demand"
+            app:layout_constraintStart_toStartOf="@+id/editText_destination_demand" />
+
+        <Button
+            android:id="@+id/button_seats_demand_plus"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:minHeight="0dp"
+            android:minWidth="0dp"
+            android:text="@string/button_plus"
+            android:visibility="visible"
+            app:layout_constraintBaseline_toBaselineOf="@+id/textView_seats_demand"
+            app:layout_constraintEnd_toEndOf="@+id/editText_destination_demand" />
+
+    </android.support.constraint.ConstraintLayout>
+</ScrollView>
