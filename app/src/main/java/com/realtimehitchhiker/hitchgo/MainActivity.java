@@ -30,7 +30,9 @@ import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.ImageButton;
 import android.widget.ImageView;
+import android.widget.RelativeLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -108,7 +110,6 @@ public class MainActivity extends AppCompatActivity {
 
     // Variable that store some user data for quick access
     private String facebookUserId = null;
-    private String photoUrl = null;
     private Location location = null;
     private Double latitude = null;
     private Double longitude = null;
@@ -119,6 +120,7 @@ public class MainActivity extends AppCompatActivity {
     private Button btnDemand;
     private TextView txtShowLocation, txtWelcome;
     private ImageView imProfile;
+    private ImageButton imageButtonSetting;
 
     // BroadcastReceiver (for inter-modules/services communication)
     private BroadcastReceiver broadcastReceiverLocationUpdate, broadcastReceiverLocionProviderOff, broadcastReceiverSupplyFound;
@@ -141,7 +143,6 @@ public class MainActivity extends AppCompatActivity {
 
         //Firebase initialization
         mAuth = FirebaseAuth.getInstance();
-        currentUser = mAuth.getCurrentUser();
         FirebaseDatabase database = FirebaseDatabase.getInstance();
         DatabaseReference myDataBaseRef = database.getReference();
         //Get pointers to all the nodes/folders of the database
@@ -163,6 +164,7 @@ public class MainActivity extends AppCompatActivity {
         btnLog = findViewById(R.id.button_login);
         btnSupply = findViewById(R.id.button_supply);
         btnDemand = findViewById(R.id.button_demand);
+        imageButtonSetting = findViewById(R.id.imageButton_settings);
         imProfile = findViewById(R.id.profile_image);
         //imProfile.setMaxHeight(100);
         //imProfile.setMaxWidth(100);
@@ -192,13 +194,13 @@ public class MainActivity extends AppCompatActivity {
         Log.d(TAG, "MAIN_onStart" );
 
         //Check if user is signed in (non-null) and update UI accordingly.
+        currentUser = mAuth.getCurrentUser();
         updateUI(currentUser);
 
         // Check permissions at runtime and get them if need to and start firebase service and location service
         if(!runtimePermissions()) {
             enableFirebaseAndLocationService();
         }
-
     }
 
     @Override
@@ -406,7 +408,6 @@ public class MainActivity extends AppCompatActivity {
                         // user is now signed out
                         currentUser = mAuth.getCurrentUser(); //normally =null
                         facebookUserId = null;
-                        photoUrl = null;
                         flag_supply = false;
                         flag_demand = false;
                         SharedPreferences.Editor editor = sharedPref.edit();
@@ -535,13 +536,21 @@ public class MainActivity extends AppCompatActivity {
      *
      * @param user The FirebaseUser variable that hold the current user metadata (can be null if not logged in)
      */
-    private void updateUI(FirebaseUser user){
+    private void updateUI(FirebaseUser user){//todo initializeLogButton....
         //if already signed in
         if(user!=null){
             //set the UI and initialize the Log Button
             initializeLogButton(true);
             txtWelcome.setText(R.string.ui_welcome_logged_in);
             txtWelcome.append("\n" + user.getDisplayName());
+
+            //Show the UI for logged in users
+            btnSupply.setVisibility(View.VISIBLE);
+            btnDemand.setVisibility(View.VISIBLE);
+            txtShowLocation.setVisibility(View.VISIBLE);
+            imProfile.setVisibility(View.VISIBLE);
+            imageButtonSetting.setVisibility(View.VISIBLE);
+            btnLog.setVisibility(View.GONE);
 
             // find the Facebook profile and get the user's id
             for(UserInfo profile : currentUser.getProviderData()) {
@@ -552,7 +561,7 @@ public class MainActivity extends AppCompatActivity {
             }
             // construct the URL to the profile picture, with a custom height
             // alternatively, use '?type=small|medium|large' instead of ?height=500
-            photoUrl = "https://graph.facebook.com/" + facebookUserId + "/picture?type=large";
+            String photoUrl = "https://graph.facebook.com/" + facebookUserId + "/picture?type=large";
             //Download the profile picture from Facebook (download it in background asynchronously)
             new DownloadImageTask(new DownloadImageTask.AsyncResponse() {
                 @Override
@@ -567,6 +576,14 @@ public class MainActivity extends AppCompatActivity {
             initializeLogButton(false);
             txtWelcome.setText(R.string.ui_welcome_logged_out);
             imProfile.setImageResource(R.drawable.com_facebook_profile_picture_blank_square);
+
+            //Hide the UI
+            btnSupply.setVisibility(View.INVISIBLE);
+            btnDemand.setVisibility(View.INVISIBLE);
+            txtShowLocation.setVisibility(View.INVISIBLE);
+            imProfile.setVisibility(View.INVISIBLE);
+            imageButtonSetting.setVisibility(View.INVISIBLE);
+            btnLog.setVisibility(View.VISIBLE);
         }
 
         //initialize supply and demand button accordingly to the user state

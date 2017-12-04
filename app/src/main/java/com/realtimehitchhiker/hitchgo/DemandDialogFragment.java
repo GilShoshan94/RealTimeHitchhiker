@@ -74,6 +74,7 @@ public class DemandDialogFragment extends DialogFragment {
         demand_seats = sharedPref.getInt(getString(R.string.pref_demand_seats_in_car), 1);
         demand_pet = sharedPref.getBoolean(getString(R.string.pref_demand_pet), false);
 
+        setCancelable(false);
     }
 
     @NonNull

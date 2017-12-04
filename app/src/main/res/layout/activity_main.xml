@@ -26,6 +26,7 @@
         android:layout_height="0dp"
         android:layout_marginTop="24dp"
         android:text="Welcome"
+        android:visibility="visible"
         app:layout_constraintEnd_toStartOf="@+id/imageButton_settings"
         app:layout_constraintHorizontal_bias="0.5"
         app:layout_constraintStart_toEndOf="@+id/profile_image"
@@ -63,7 +64,7 @@
         android:layout_marginEnd="16dp"
         android:layout_marginStart="16dp"
         android:text="@string/button_giveRide"
-        app:layout_constraintBottom_toTopOf="@+id/button_login"
+        app:layout_constraintBottom_toTopOf="@+id/textView_testCoordinates"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@+id/button_demand" />
@@ -72,17 +73,19 @@
         android:id="@+id/button_login"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginEnd="16dp"
-        android:layout_marginStart="16dp"
+        android:layout_marginBottom="8dp"
+        android:layout_marginEnd="8dp"
+        android:layout_marginStart="8dp"
+        android:layout_marginTop="8dp"
         android:background="@drawable/com_facebook_button_background"
         android:drawableLeft="@drawable/com_facebook_button_icon_blue"
         android:elevation="0dp"
         android:text="@string/button_login"
-        app:layout_constraintBottom_toTopOf="@+id/textView_testCoordinates"
+        android:visibility="visible"
+        app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintHorizontal_bias="0.5"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/button_supply" />
+        app:layout_constraintTop_toTopOf="parent" />
 
 
     <TextView
@@ -96,6 +99,6 @@
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintHorizontal_bias="0.5"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/button_login" />
+        app:layout_constraintTop_toBottomOf="@+id/button_supply" />
 
 </android.support.constraint.ConstraintLayout>

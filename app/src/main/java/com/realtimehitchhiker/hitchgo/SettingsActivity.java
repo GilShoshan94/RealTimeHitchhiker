@@ -4,10 +4,17 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Bundle;
+import android.support.annotation.NonNull;
 import android.support.v4.content.LocalBroadcastManager;
 import android.support.v7.app.AppCompatActivity;
+import android.view.View;
+import android.widget.Button;
 import android.widget.SeekBar;
 import android.widget.TextView;
+
+import com.firebase.ui.auth.AuthUI;
+import com.google.android.gms.tasks.OnCompleteListener;
+import com.google.android.gms.tasks.Task;
 
 public class SettingsActivity extends AppCompatActivity {
     public static final String BROADCAST_ACTION_RADIUS_UPDATE = "com.realtimehitchhiker.hitchgo.RADIUS_UPDATE";
@@ -16,6 +23,7 @@ public class SettingsActivity extends AppCompatActivity {
     private SharedPreferences sharedPref;
     private TextView txtShowRadius;
     private SeekBar barRadius;
+    private Button btnLogout;
     private int radius;
     private int minimum;
     private int maximum;
@@ -35,8 +43,9 @@ public class SettingsActivity extends AppCompatActivity {
         maximum = getResources().getInteger(R.integer.pref_radius_max);
         radius = sharedPref.getInt(getString(R.string.pref_radius), minimum); //minimum = defaultValue
 
-        txtShowRadius = (TextView) findViewById(R.id.textView_prefs_radius_unit);
-        barRadius = (SeekBar) findViewById(R.id.seekBar_prefs_radius);
+        txtShowRadius = findViewById(R.id.textView_prefs_radius_unit);
+        barRadius = findViewById(R.id.seekBar_prefs_radius);
+        btnLogout = findViewById(R.id.button_logout);
 
         txtShowRadius.setText(String.valueOf(radius));
         txtShowRadius.append(" " + getString(R.string.settings_radius_unit));
@@ -64,6 +73,27 @@ public class SettingsActivity extends AppCompatActivity {
             @Override
             public void onStopTrackingTouch(SeekBar seekBar) {
 
+            }
+        });
+
+        btnLogout.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                AuthUI.getInstance()
+                        .signOut(getApplication())
+                        .addOnCompleteListener(new OnCompleteListener<Void>() {
+                            public void onComplete(@NonNull Task<Void> task) {
+                                // user is now signed out
+                                boolean flag_supply = false;
+                                boolean flag_demand = false;
+                                SharedPreferences.Editor editor = sharedPref.edit();
+                                editor.putBoolean(getString(R.string.pref_supply_status), flag_supply);
+                                editor.putBoolean(getString(R.string.pref_demand_status), flag_demand);
+                                editor.apply();
+
+                                updateUI(currentUser);
+                            }
+                        });
             }
         });
     }

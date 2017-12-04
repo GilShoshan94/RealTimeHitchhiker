@@ -79,6 +79,7 @@ public class SupplyDialogFragment extends DialogFragment implements CounterHandl
         fuel_price = sharedPref.getInt(getString(R.string.pref_supply_fuel_price), 0);
         allow_pet_supply = sharedPref.getBoolean(getString(R.string.pref_supply_pet), false);
 
+        setCancelable(false);
     }
 
     @NonNull
