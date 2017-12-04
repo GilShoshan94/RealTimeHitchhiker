@@ -945,10 +945,10 @@ public class MainActivity extends AppCompatActivity {
     private EditText txtDestination;
     private TextView txtFuelPrice;
     private TextView txtSeatsSupply;
+    CheckBox checkBoxPetSupply;
     //todo String currency...
     String currency = "NIS";
 
-    CheckBox checkBoxPetSupply = new CheckBox(this);
     public void setSupplyDetails(){
         //UI initialization of links
         /*txtDestination = dialogSupplyLayout.findViewById(R.id.editText_destination);
@@ -1022,8 +1022,8 @@ public class MainActivity extends AppCompatActivity {
                 .setPositiveButton(R.string.alert_dialog_ok, new DialogInterface.OnClickListener() {
                     public void onClick(DialogInterface dialog, int whichButton) {
 
-                        allow_pet_supply = checkBoxPetSupply.isChecked();
-                        String destination = txtDestination.getText().toString();
+                        //allow_pet_supply = checkBoxPetSupply.isChecked();
+                        //String destination = txtDestination.getText().toString();
 
                         SharedPreferences.Editor editor = sharedPref.edit();
                         editor.putInt(getString(R.string.pref_supply_seats_in_car), seats_in_car);
@@ -1031,7 +1031,7 @@ public class MainActivity extends AppCompatActivity {
                         editor.putBoolean(getString(R.string.pref_supply_pet), allow_pet_supply);
                         editor.apply();
 
-                        MySupply mySupply = new MySupply(destination, seats_in_car, fuel_price, allow_pet_supply);
+                        MySupply mySupply = new MySupply("labas", seats_in_car, fuel_price, allow_pet_supply);
                         refSupply.child(facebookUserId).setValue(mySupply);
                         geoFireSupply.setLocation(facebookUserId, new GeoLocation(latitude, longitude));
 
@@ -1040,7 +1040,7 @@ public class MainActivity extends AppCompatActivity {
                 .setNegativeButton(R.string.alert_dialog_cancel, new DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(DialogInterface dialog, int which) {
-                        allow_pet_supply = checkBoxPetSupply.isChecked();
+                        //allow_pet_supply = checkBoxPetSupply.isChecked();
 
                         SharedPreferences.Editor editor = sharedPref.edit();
                         editor.putInt(getString(R.string.pref_supply_seats_in_car), seats_in_car);
