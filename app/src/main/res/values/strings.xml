@@ -26,6 +26,10 @@
     <string name="pref_supply_seats_in_car" translatable="false">supplySeatsInt</string>
     <string name="pref_demand_seats_in_car" translatable="false">demandSeatsInt</string>
     <string name="pref_main_request_boolean" translatable="false">mainRequestBool</string>
+    <string name="pref_phone_number" translatable="false">phoneNumberString</string>
+    <string name="pref_supply_fuel_price" translatable="false">supplyFuelPriceInt</string>
+    <string name="pref_supply_pet" translatable="false">supplyPetBool</string>
+    <string name="pref_demand_pet" translatable="false">demandPetBool</string>
 
     <!-- Notification -->
     <string name="channel_id" translatable="false">com.realtimehitchhiker.hitchgo.NOTIFICATION_CHANNEL_ID</string>
@@ -45,19 +49,36 @@
     <string name="alert_dialog_cancel">Cancel</string>
     <string name="alert_dialog_location_title">Location is required</string>
     <string name="alert_dialog_location_message">Location is not enabled. Do you want to go to settings menu?</string>
-    <string name="alert_dialog_num_seats_supply_title">Supply Settings</string>
-    <string name="alert_dialog_num_seats_supply_message">How many seats do you offer?</string>
-    <string name="alert_dialog_num_seats_demand_title">Request Settings</string>
-    <string name="alert_dialog_num_seats_demand_message">How many seats do you request?</string>
+    <string name="alert_dialog_supply_title">Supply Settings</string>
+    <string name="alert_dialog_supply_message">Set the details and click OK</string>
+    <string name="alert_dialog_demand_title">Request Settings</string>
+    <string name="alert_dialog_demand_message">Set the details and click OK</string>
     <string name="alert_dialog_permission_location_title">App needs Location permission</string>
     <string name="alert_dialog_permission_location_message">Grant to location permission or leave the app</string>
-    <string name="alert_dialog_permission_location_negative_button">leave the app</string>
+    <string name="alert_dialog_permission_location_negative_button">Leave the app</string>
+    <string name="alert_dialog_phone_number_title">Phone number checking</string>
+    <string name="alert_dialog_phone_number_message">Enter your phone number please</string>
     <string name="ui_welcome_logged_in">Welcome</string>
     <string name="ui_welcome_logged_out">Welcome, please log in</string>
     <string name="toast_sign_in_cancelled">Sign in cancelled by the user</string>
     <string name="toast_no_internet_connection">No Internet Connection</string>
     <string name="toast_not_logged_in">You are not logged in\nLog in please</string>
     <string name="toast_no_location_fix">Enable location or wait for location fix</string>
+    <string name="toast_invalid_phone_number">Invalid phone number</string>
+
+    <!-- DialogSettings -->
+    <string name="button_plus" translatable="false">+</string>
+    <string name="button_minus" translatable="false">-</string>
+
+    <!-- DialogSupplySettings -->
+    <string name="txt_hint_destination">Enter destination</string>
+    <string name="txt_fuel_price">Fuel price</string>
+    <string name="txt_seat_supply">Seats available</string>
+    <string name="check_box_pet_supply">Allow pet</string>
+
+    <!-- DialogDemandSettings -->
+    <string name="txt_seat_demand">Seats needed</string>
+    <string name="check_box_pet_demand">Have a pet</string>
 
     <!-- Settings -->
     <string name="settings">Settings</string>

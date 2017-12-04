@@ -35,4 +35,5 @@
         android:text="@string/settings_radius_unit"
         app:layout_constraintBaseline_toBaselineOf="@+id/textView_prefs_radius"
         app:layout_constraintEnd_toEndOf="parent" />
+
 </android.support.constraint.ConstraintLayout>

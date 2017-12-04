@@ -81,3 +81,6 @@ public class SettingsActivity extends AppCompatActivity {
         localBroadcastManager.sendBroadcast(intent);
     }
 }
+
+//todo
+//refUsers.child(facebookUserId).child("phone").setValue(phone_number);

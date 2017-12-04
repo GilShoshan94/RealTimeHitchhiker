@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="fill_parent"
+    android:layout_height="fill_parent"
+    android:fillViewport="true"> <!--IMPORTANT otherwise backgrnd img. will not fill the whole screen -->
+
+    <android.support.constraint.ConstraintLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+
+        <EditText
+            android:id="@+id/editText_destination"
+            style="@style/Widget.AppCompat.AutoCompleteTextView"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:ems="10"
+            android:hint="@string/txt_hint_destination"
+            android:inputType="text"
+            android:visibility="visible"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintHorizontal_bias="0.5"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+
+        <TextView
+            android:id="@+id/textView_fuel_price"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="32dp"
+            android:text="@string/txt_fuel_price"
+            android:visibility="visible"
+            app:layout_constraintEnd_toEndOf="@+id/editText_destination"
+            app:layout_constraintStart_toStartOf="@+id/editText_destination"
+            app:layout_constraintTop_toBottomOf="@+id/editText_destination" />
+
+        <TextView
+            android:id="@+id/textView_seats_supply"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="32dp"
+            android:text="@string/txt_seat_supply"
+            android:visibility="visible"
+            app:layout_constraintEnd_toEndOf="@+id/textView_fuel_price"
+            app:layout_constraintStart_toStartOf="@+id/textView_fuel_price"
+            app:layout_constraintTop_toBottomOf="@+id/textView_fuel_price" />
+
+        <CheckBox
+            android:id="@+id/checkBox_pet_supply"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="32dp"
+            android:checked="false"
+            android:minHeight="0dp"
+            android:minWidth="0dp"
+            android:text="@string/check_box_pet_supply"
+            android:visibility="visible"
+            app:layout_constraintEnd_toEndOf="@+id/textView_seats_supply"
+            app:layout_constraintStart_toStartOf="@+id/textView_seats_supply"
+            app:layout_constraintTop_toBottomOf="@+id/textView_seats_supply" />
+
+        <Button
+            android:id="@+id/button_fuel_minus"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:minHeight="0dp"
+            android:minWidth="0dp"
+            android:text="@string/button_minus"
+            android:visibility="visible"
+            app:layout_constraintBaseline_toBaselineOf="@+id/textView_fuel_price"
+            app:layout_constraintStart_toStartOf="@+id/editText_destination" />
+
+        <Button
+            android:id="@+id/button_fuel_plus"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:minHeight="0dp"
+            android:minWidth="0dp"
+            android:text="@string/button_plus"
+            android:visibility="visible"
+            app:layout_constraintBaseline_toBaselineOf="@+id/textView_fuel_price"
+            app:layout_constraintEnd_toEndOf="@+id/editText_destination" />
+
+        <Button
+            android:id="@+id/button_seats_supply_minus"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:minHeight="0dp"
+            android:minWidth="0dp"
+            android:text="@string/button_minus"
+            android:visibility="visible"
+            app:layout_constraintBaseline_toBaselineOf="@+id/textView_seats_supply"
+            app:layout_constraintStart_toStartOf="@+id/button_fuel_minus" />
+
+        <Button
+            android:id="@+id/button_seats_supply_plus"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:minHeight="0dp"
+            android:minWidth="0dp"
+            android:text="@string/button_plus"
+            android:visibility="visible"
+            app:layout_constraintBaseline_toBaselineOf="@+id/textView_seats_supply"
+            app:layout_constraintEnd_toEndOf="@+id/button_fuel_plus" />
+
+    </android.support.constraint.ConstraintLayout>
+</ScrollView>

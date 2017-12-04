@@ -42,11 +42,11 @@ public class LocationService extends Service {
     private MyLocationListener listener = new MyLocationListener();
 
     // The minimum distance to change updates, in meters
-    private final float MIN_DISTANCE = (float) getResources().getInteger(R.integer.location_min_distance);
+    private float MIN_DISTANCE;
     // The minimum time between updates from a provider, in milliseconds
-    private final long MIN_TIME = (long) getResources().getInteger(R.integer.location_min_time);
+    private long MIN_TIME;
     // The maximum time between updates for the location, in milliseconds
-    private final int MAXIMUM_TIME = getResources().getInteger(R.integer.location_max_time);
+    private int MAXIMUM_TIME;
 
     class MyLocationListener implements LocationListener{
         Location listLoc;
@@ -150,8 +150,6 @@ public class LocationService extends Service {
         localBroadcastManager.sendBroadcast(intentOff);
     }
 
-    //public LocationService() {
-    //}
 
     /** Determines whether one Location reading is better than the current Location fix
      * @param location  The new Location that you want to evaluate
@@ -219,6 +217,15 @@ public class LocationService extends Service {
     @Override
     public void onCreate() {
         super.onCreate();
+        //initialize the parameters
+        Log.d(TAG, "initialize the parameters " + getApplicationContext().toString());
+        MIN_DISTANCE = (float) getApplicationContext().getResources().getInteger(R.integer.location_min_distance);
+        MIN_TIME = (long) getApplicationContext().getResources().getInteger(R.integer.location_min_time);
+        MAXIMUM_TIME = getApplicationContext().getResources().getInteger(R.integer.location_max_time);
+        Log.d(TAG, "MIN_DISTANCE = " + String.valueOf(MIN_DISTANCE));
+        Log.d(TAG, "MIN_TIME = " + String.valueOf(MIN_TIME));
+        Log.d(TAG, "MAXIMUM_TIME = " + String.valueOf(MAXIMUM_TIME));
+
         if (mLocationManager == null)
             mLocationManager = (LocationManager) getApplicationContext().getSystemService(Context.LOCATION_SERVICE);
 

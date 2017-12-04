@@ -19,10 +19,19 @@ import android.provider.Settings;
 import android.support.annotation.NonNull;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.LocalBroadcastManager;
+import android.support.v4.widget.TextViewCompat;
 import android.support.v7.app.AppCompatActivity;
+import android.telephony.PhoneNumberFormattingTextWatcher;
+import android.telephony.TelephonyManager;
+import android.text.Editable;
+import android.text.InputFilter;
+import android.text.InputType;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
+import android.widget.CheckBox;
+import android.widget.CheckedTextView;
+import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -49,7 +58,12 @@ import com.google.firebase.database.ValueEventListener;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.ThreadLocalRandom;
+
+import io.michaelrocks.libphonenumber.android.NumberParseException;
+import io.michaelrocks.libphonenumber.android.PhoneNumberUtil;
+import io.michaelrocks.libphonenumber.android.Phonenumber;
 
 /**
  * THis is the main activity of the app
@@ -68,8 +82,12 @@ public class MainActivity extends AppCompatActivity {
     // SharedPreferences parameters
     private SharedPreferences sharedPref;
     private int radius; // in meters
+    private int fuel_price;
+    private boolean allow_pet_supply;
+    private boolean demand_pet;
     private int seats_in_car;
     private int demand_seats;
+    private String phone_number;
 
     // Firebase variables
     private FirebaseAuth mAuth;
@@ -129,22 +147,16 @@ public class MainActivity extends AppCompatActivity {
         currentUser = mAuth.getCurrentUser();
         FirebaseDatabase database = FirebaseDatabase.getInstance();
         DatabaseReference myDataBaseRef = database.getReference();
-        //Get pointers to all the nodes/folders of the database //todo
-        refUsers = myDataBaseRef.child("users/");
+        //Get pointers to all the nodes/folders of the database
         refUsers = myDataBaseRef.child(getString(R.string.firebase_folder_users));
-        refSupply = myDataBaseRef.child("supply/");
         refSupply = myDataBaseRef.child(getString(R.string.firebase_folder_supply));
-        refDemand = myDataBaseRef.child("demand/");
         refDemand = myDataBaseRef.child(getString(R.string.firebase_folder_demand));
-        refHistory = myDataBaseRef.child("history/");
         refHistory = myDataBaseRef.child(getString(R.string.firebase_folder_history));
         //The geofire folders holds the location coordinates latitude and longitude
         // encode into a single hash-key with the propriety that 2 closes locations share the
         // same "code" at the beginning of their keys. The technique is close "Geohashing"
         // We use the geohashing from the GeoFire library from Google for Firebase
-        geoFireSupply = new GeoFire(myDataBaseRef.child("geofire/geofire-supply"));
         geoFireSupply = new GeoFire(myDataBaseRef.child(getString(R.string.firebase_folder_geofire_supply)));
-        geoFireDemand = new GeoFire(myDataBaseRef.child("geofire/geofire-demand"));
         geoFireDemand = new GeoFire(myDataBaseRef.child(getString(R.string.firebase_folder_geofire_demand)));
         globalHistory = new MyGlobalHistory(refHistory);
 
@@ -152,8 +164,8 @@ public class MainActivity extends AppCompatActivity {
         txtShowLocation = findViewById(R.id.textView_testCoordinates);
         txtWelcome = findViewById(R.id.textView_welcome_profile);
         btnLog = findViewById(R.id.button_login);
-        btnSupply = findViewById(R.id.button_giveRide);
-        btnDemand = findViewById(R.id.button_findRide);
+        btnSupply = findViewById(R.id.button_supply);
+        btnDemand = findViewById(R.id.button_demand);
         imProfile = findViewById(R.id.profile_image);
         //imProfile.setMaxHeight(100);
         //imProfile.setMaxWidth(100);
@@ -166,19 +178,24 @@ public class MainActivity extends AppCompatActivity {
         int defaultValue = getResources().getInteger(R.integer.pref_radius_min);
         radius = sharedPref.getInt(getString(R.string.pref_radius), defaultValue);
         seats_in_car = sharedPref.getInt(getString(R.string.pref_supply_seats_in_car), 1);
-        demand_seats = sharedPref.getInt(getString(R.string.pref_supply_seats_in_car), 1);
+        fuel_price = sharedPref.getInt(getString(R.string.pref_supply_fuel_price), 0);
+        allow_pet_supply = sharedPref.getBoolean(getString(R.string.pref_supply_pet), false);
+        demand_pet = sharedPref.getBoolean(getString(R.string.pref_demand_pet), false);
+        demand_seats = sharedPref.getInt(getString(R.string.pref_demand_seats_in_car), 1);
         flag_supply = sharedPref.getBoolean(getString(R.string.pref_supply_status), false);
         flag_demand = sharedPref.getBoolean(getString(R.string.pref_demand_status), false);
+        phone_number = sharedPref.getString(getString(R.string.pref_phone_number), "false");
         Log.d(TAG, "getSharedPreferences : radius = " + radius );
 
-        //Check if user is signed in (non-null) and update UI accordingly.
-        updateUI(currentUser);
     }
 
     @Override
     protected void onStart() {
         super.onStart();
         Log.d(TAG, "MAIN_onStart" );
+
+        //Check if user is signed in (non-null) and update UI accordingly.
+        updateUI(currentUser);
 
         // Check permissions at runtime and get them if need to and start firebase service and location service
         if(!runtimePermissions()) {
@@ -298,7 +315,6 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
@@ -314,7 +330,7 @@ public class MainActivity extends AppCompatActivity {
                 //Successfully signed in
                 //Get the current user, update the UI and add the user to the database if required
                 currentUser = mAuth.getCurrentUser();
-                addUserIfNewInFirebaseOrGetSupplyDemandStatusAndUpdateUI();
+                addUserIfNewInFirebaseOrGetSupplyDemandStatusAndPhoneNumberUpdateAndUpdateUI();
                 updateUI(currentUser);
 
                 //Here down we are logging all the data Firebase Authentication can provide us by curiosity fo development
@@ -693,11 +709,124 @@ public class MainActivity extends AppCompatActivity {
     }
 
     /**
-     * add user if new in firebase database OR get Supply Demand status and update UI
-     * will query the database to find the user, if not found then must be new and then add it
+     * Get and check the phone number by asking the user (need that currentUser != null) and update the database
      */
-    public void addUserIfNewInFirebaseOrGetSupplyDemandStatusAndUpdateUI() {
-        Log.d(TAG, "addUserIfNewInFirebaseOrGetSupplyDemandStatusAndUpdateUI" );
+    public void getOrCheckPhoneNumber() {
+        Log.d(TAG, "getOrCheckPhoneNumber");
+
+        final TelephonyManager manager = (TelephonyManager) this.getSystemService(Context.TELEPHONY_SERVICE);
+        //getNetworkCountryIso
+        assert manager != null;
+        String CountryID= manager.getSimCountryIso().toUpperCase();
+        Log.d(TAG, "getNetworkCountryIso = "+CountryID);
+        final PhoneNumberUtil phoneUtil = PhoneNumberUtil.createInstance(getApplicationContext());
+
+        String prefetch_phone_number = "+";
+        phone_number = sharedPref.getString(getString(R.string.pref_phone_number), "false");
+        if(!Objects.equals(phone_number, "false"))
+            prefetch_phone_number = phone_number;
+        else if(currentUser.getPhoneNumber() != null) {
+            prefetch_phone_number = currentUser.getPhoneNumber();
+            final Phonenumber.PhoneNumber phoneNumber;
+            try {
+                phoneNumber = phoneUtil.parse(prefetch_phone_number, CountryID);
+                prefetch_phone_number = (phoneUtil.format(phoneNumber, PhoneNumberUtil.PhoneNumberFormat.INTERNATIONAL));
+            } catch (NumberParseException e) {
+                e.printStackTrace();
+            }
+        }
+
+        //final Spinner spinnerCountry = new Spinner(this); //todo improvement add a spinner to select country
+
+        final EditText textPhoneNumber = new EditText(this);
+        textPhoneNumber.setHint("Phone number");
+        textPhoneNumber.setText(prefetch_phone_number);
+        textPhoneNumber.addTextChangedListener(new PhoneNumberFormattingTextWatcher(CountryID){
+            boolean flag_reset = false;
+            @Override
+            public synchronized void afterTextChanged(Editable s) {
+                super.afterTextChanged(s);
+                if(s.length()==1 && flag_reset) {
+                    flag_reset = false;
+                    s.clear();
+                }
+                else if(s.length()==0){
+                    s.append("+");
+                }
+                else if(s.length()>1 && !flag_reset) {
+                    flag_reset = true;
+                }
+
+            }
+        });
+        textPhoneNumber.setLines(1);
+        textPhoneNumber.setFilters(new InputFilter[]{new InputFilter.LengthFilter(18)}); // max(here 18) is the max input char for phone number
+        textPhoneNumber.setInputType(InputType.TYPE_CLASS_PHONE);
+        textPhoneNumber.setSelection(textPhoneNumber.getText().length());
+
+
+        AlertDialog.Builder builder = new AlertDialog.Builder(this)
+                .setView(textPhoneNumber)
+                .setTitle(R.string.alert_dialog_phone_number_title)
+                .setMessage(R.string.alert_dialog_phone_number_message)
+                .setPositiveButton(R.string.alert_dialog_ok, null)
+                .setCancelable(false);
+
+        final AlertDialog dialog = builder.create();
+        dialog.show();
+        //Overriding the handler immediately after show
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(new View.OnClickListener()
+        {
+            @Override
+            public void onClick(View v)
+            {
+                phone_number = textPhoneNumber.getText().toString();
+
+                //getNetworkCountryIso
+                assert manager != null;
+                String CountryID= manager.getSimCountryIso().toUpperCase();
+                Phonenumber.PhoneNumber forCheckPhoneNumber = phoneUtil.getInvalidExampleNumber(CountryID);
+                try {
+                    forCheckPhoneNumber = phoneUtil.parse(phone_number, CountryID);
+                    Log.d(TAG, "forCheckPhoneNumber" + forCheckPhoneNumber.toString() + " phone_number " + phone_number);
+                } catch (NumberParseException e) {
+                    e.printStackTrace();
+                }
+
+                Log.d(TAG, "forCheckPhoneNumber" + forCheckPhoneNumber.toString());
+                if(phoneUtil.isValidNumber(forCheckPhoneNumber)) {
+                    SharedPreferences.Editor editor = sharedPref.edit();
+                    editor.putString(getString(R.string.pref_phone_number), phone_number);
+                    editor.apply();
+                    refUsers.child(facebookUserId).child("phone").setValue(phone_number);
+
+                    dialog.dismiss();
+                }
+                else {
+                    //else dialog stays open. Make sure you have an obvious way to close the dialog especially if you set cancellable to false.
+                    Toast.makeText(getApplicationContext(), R.string.toast_invalid_phone_number,
+                            Toast.LENGTH_SHORT).show();
+                }
+            }
+        });
+    }
+
+    /**
+     * add user if new in firebase database OR get Supply Demand status and phone number update and update UI
+     * will query the database to find the user, if not found then must be new and then add it
+     * if present in the database, will check the status and the phone number
+     */
+    public void addUserIfNewInFirebaseOrGetSupplyDemandStatusAndPhoneNumberUpdateAndUpdateUI() {
+        Log.d(TAG, "addUserIfNewInFirebaseOrGetSupplyDemandStatusAndPhoneNumberUpdateAndUpdateUI" );
+
+        // find the Facebook profile and get the user's id
+        for(UserInfo profile : currentUser.getProviderData()) {
+            // check if the provider id matches "facebook.com"
+            if(FacebookAuthProvider.PROVIDER_ID.equals(profile.getProviderId())) {
+                facebookUserId = profile.getUid();
+            }
+        }
+
         if(facebookUserId==null){
             Toast.makeText(getApplicationContext(), R.string.toast_not_logged_in,
                     Toast.LENGTH_SHORT).show();
@@ -708,14 +837,16 @@ public class MainActivity extends AppCompatActivity {
         checkKeyQuery.addListenerForSingleValueEvent(new ValueEventListener() {
             @Override
             public void onDataChange(DataSnapshot dataSnapshot) {
-                Log.d(TAG, "addUserIfNewInFirebaseOrGetSupplyDemandStatusAndUpdateUI onDataChange" );
+                Log.d(TAG, "addUserIfNewInFirebaseOrGetSupplyDemandStatusAndPhoneNumberUpdateAndUpdateUI onDataChange" );
                 Log.d(TAG, "DATABASE Value is: " + dataSnapshot.toString());
                 //if the user doesn't exist in the database, then add it
                 if(!dataSnapshot.exists()){
+                    getOrCheckPhoneNumber();
                     addNewUserToFirebase();
                 }
-                //else the user already exist, check Supply/Demand status and update UI
+                //else the user already exist, check Supply/Demand status and update UI and update phone number
                 else {
+                    getOrCheckPhoneNumber();
                     checkSupplyDemandStatusAndUpdateUI();
                 }
             }
@@ -741,7 +872,7 @@ public class MainActivity extends AppCompatActivity {
 
         DatabaseReference myRef = refUsers.child(facebookUserId);
         MyUser myUser = new MyUser(currentUser.getDisplayName(), currentUser.getEmail(),
-                                    currentUser.getPhoneNumber());
+                                    phone_number);
         myRef.setValue(myUser);
     }
 
@@ -803,34 +934,119 @@ public class MainActivity extends AppCompatActivity {
             return false;
         }
 
-        chooseNumberSupplyAlert();//todo
+        setSupplyDetails();
 
         return true;
     }
 
-    //todo
-    public void chooseNumberSupplyAlert(){
-        final MySeekBar barNumber1 = new MySeekBar(this);
-        barNumber1.setMax(getResources().getInteger(R.integer.pref_supply_max_seats_in_car)-1);
-        barNumber1.setProgress(seats_in_car-1);
 
+    //todo comments
+    View dialogSupplyLayout = getLayoutInflater().inflate(R.layout.dialog_supply,null);
+    private EditText txtDestination;
+    private TextView txtFuelPrice;
+    private TextView txtSeatsSupply;
+    //todo String currency...
+    String currency = "NIS";
+
+    CheckBox checkBoxPetSupply = new CheckBox(this);
+    public void setSupplyDetails(){
+        //UI initialization of links
+        /*txtDestination = dialogSupplyLayout.findViewById(R.id.editText_destination);
+
+        txtFuelPrice = dialogSupplyLayout.findViewById(R.id.textView_fuel_price);
+        Button btnPlusPrice = dialogSupplyLayout.findViewById(R.id.button_fuel_plus);
+        Button btnMinusPrice = dialogSupplyLayout.findViewById(R.id.button_fuel_minus);
+
+        txtSeatsSupply = dialogSupplyLayout.findViewById(R.id.textView_seats_supply);
+        Button btnPlusSeats = dialogSupplyLayout.findViewById(R.id.button_seats_supply_plus);
+        Button btnMinusSeats = dialogSupplyLayout.findViewById(R.id.button_seats_supply_minus);
+
+        checkBoxPetSupply = dialogSupplyLayout.findViewById(R.id.checkBox_pet_supply);
+
+        //UI set from sharedPreferences
+        final int max_seats = getResources().getInteger(R.integer.pref_supply_max_seats_in_car);
+        final int min_seats = 1;
+        final int max_fuel_price = getResources().getInteger(R.integer.pref_max_fuel_price);
+        final int min_fuel_price = 0;
+
+        txtFuelPrice.setText(R.string.txt_fuel_price); txtFuelPrice.append(" "+fuel_price+" "+ currency);
+        txtSeatsSupply.setText(R.string.txt_seat_supply); txtSeatsSupply.append(" "+seats_in_car);
+        checkBoxPetSupply.setChecked(allow_pet_supply);
+
+        //Set the listeners
+        btnPlusPrice.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if(fuel_price < max_fuel_price) {
+                    fuel_price++;
+                    txtFuelPrice.setText(R.string.txt_fuel_price);
+                    txtFuelPrice.append(" " + fuel_price + " " + currency);
+                }
+            }
+        });
+        btnMinusPrice.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if(fuel_price > min_fuel_price) {
+                    fuel_price--;
+                    txtFuelPrice.setText(R.string.txt_fuel_price);
+                    txtFuelPrice.append(" " + fuel_price + " " + currency);
+                }
+            }
+        });
+        btnPlusSeats.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if(seats_in_car < max_seats) {
+                    seats_in_car++;
+                    txtSeatsSupply.setText(R.string.txt_seat_supply);
+                    txtSeatsSupply.append(" " + seats_in_car);
+                }
+            }
+        });
+        btnMinusSeats.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if(seats_in_car > min_seats) {
+                    seats_in_car--;
+                    txtSeatsSupply.setText(R.string.txt_seat_supply);
+                    txtSeatsSupply.append(" " + seats_in_car);
+                }
+            }
+        });*/
 
         new AlertDialog.Builder(this)
-                .setTitle(R.string.alert_dialog_num_seats_supply_title)
-                .setMessage(R.string.alert_dialog_num_seats_supply_message)
-                .setView(barNumber1)
+                .setTitle(R.string.alert_dialog_supply_title)
+                .setMessage(R.string.alert_dialog_supply_message)
+                .setView(R.layout.dialog_supply)
                 .setPositiveButton(R.string.alert_dialog_ok, new DialogInterface.OnClickListener() {
                     public void onClick(DialogInterface dialog, int whichButton) {
-                        seats_in_car = (barNumber1.getProgress()+1);
+
+                        allow_pet_supply = checkBoxPetSupply.isChecked();
+                        String destination = txtDestination.getText().toString();
 
                         SharedPreferences.Editor editor = sharedPref.edit();
                         editor.putInt(getString(R.string.pref_supply_seats_in_car), seats_in_car);
+                        editor.putInt(getString(R.string.pref_supply_fuel_price), fuel_price);
+                        editor.putBoolean(getString(R.string.pref_supply_pet), allow_pet_supply);
                         editor.apply();
 
-                        MySupply mySupply = new MySupply(String.valueOf(seats_in_car));
+                        MySupply mySupply = new MySupply(destination, seats_in_car, fuel_price, allow_pet_supply);
                         refSupply.child(facebookUserId).setValue(mySupply);
                         geoFireSupply.setLocation(facebookUserId, new GeoLocation(latitude, longitude));
 
+                    }
+                })
+                .setNegativeButton(R.string.alert_dialog_cancel, new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        allow_pet_supply = checkBoxPetSupply.isChecked();
+
+                        SharedPreferences.Editor editor = sharedPref.edit();
+                        editor.putInt(getString(R.string.pref_supply_seats_in_car), seats_in_car);
+                        editor.putInt(getString(R.string.pref_supply_fuel_price), fuel_price);
+                        editor.putBoolean(getString(R.string.pref_supply_pet), allow_pet_supply);
+                        editor.apply();
                     }
                 })
                 .setCancelable(false)
@@ -880,8 +1096,8 @@ public class MainActivity extends AppCompatActivity {
 
 
         new AlertDialog.Builder(this)
-                .setTitle(R.string.alert_dialog_num_seats_demand_title)
-                .setMessage(R.string.alert_dialog_num_seats_demand_message)
+                .setTitle(R.string.alert_dialog_demand_title)
+                .setMessage(R.string.alert_dialog_demand_message)
                 .setView(barNumber2)
                 .setPositiveButton(R.string.alert_dialog_ok, new DialogInterface.OnClickListener() {
                     public void onClick(DialogInterface dialog, int whichButton) {

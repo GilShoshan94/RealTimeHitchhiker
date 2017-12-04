@@ -240,7 +240,8 @@ public class ResultActivity extends AppCompatActivity {
                     //using for loop because FireBase returns JSON object that are always list.
                     for (DataSnapshot userSnapshot : dataSnapshot.getChildren()) {
                         MySupply user = userSnapshot.getValue(MySupply.class); //normally should be only one since unique KeyId
-                        remainingSeats = (user.remainingSeats);
+                        //remainingSeats = (user.remainingSeats);
+                        remainingSeats = "999"; //todo
                     }
                 }
                 refSupply.child(facebookUserIdFound).removeValue();
