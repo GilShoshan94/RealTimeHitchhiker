@@ -18,27 +18,19 @@ import android.os.Bundle;
 import android.provider.Settings;
 import android.support.annotation.NonNull;
 import android.support.v4.app.ActivityCompat;
-import android.support.v4.app.DialogFragment;
 import android.support.v4.content.LocalBroadcastManager;
 import android.support.v7.app.AppCompatActivity;
-import android.telephony.PhoneNumberFormattingTextWatcher;
-import android.telephony.TelephonyManager;
-import android.text.Editable;
-import android.text.InputFilter;
-import android.text.InputType;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
-import android.widget.EditText;
-import android.widget.ImageButton;
 import android.widget.ImageView;
-import android.widget.RelativeLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import com.facebook.FacebookSdk;
 import com.facebook.appevents.AppEventsLogger;
 import com.firebase.geofire.GeoFire;
+import com.firebase.geofire.GeoLocation;
 import com.firebase.ui.auth.AuthUI;
 import com.firebase.ui.auth.ErrorCodes;
 import com.firebase.ui.auth.IdpResponse;
@@ -57,38 +49,24 @@ import com.google.firebase.database.ValueEventListener;
 
 import java.util.Arrays;
 import java.util.List;
-import java.util.Objects;
 import java.util.concurrent.ThreadLocalRandom;
 
-import io.michaelrocks.libphonenumber.android.NumberParseException;
-import io.michaelrocks.libphonenumber.android.PhoneNumberUtil;
-import io.michaelrocks.libphonenumber.android.Phonenumber;
-
-/**
- * THis is the main activity of the app
- */
 public class MainActivity extends AppCompatActivity {
-    // The static final Strings
     public static final String BROADCAST_ACTION_MAIN_RESUME = "com.realtimehitchhiker.hitchgo.MAIN_RESUME";
     public static final String BROADCAST_ACTION_MAIN_PAUSE = "com.realtimehitchhiker.hitchgo.MAIN_PAUSE";
     public static final String BROADCAST_ACTION_MAIN_REQUEST = "com.realtimehitchhiker.hitchgo.MAIN_REQUEST";
     public static final String EXTRA_REQUEST_MESSAGE = "com.realtimehitchhiker.hitchgo.DEMAND_TRUE_CANCEL_FALSE";
     private static final int PERMISSION_LOCATION_REQUEST_CODE = 2;
-    private static final int RC_SIGN_IN = 123; //for FirebaseAuthentication request
+    private static final int RC_SIGN_IN = 123; //FireBase
     public static final double EARTH_RADIUS = 6371008.8; //in meter the mean radius of Earth is 6371008.8 m
     public static final String TAG = "MAIN_DEBUG";
 
-    // SharedPreferences parameters
     private SharedPreferences sharedPref;
     private int radius; // in meters
-    private int fuel_price;
-    private boolean allow_pet_supply;
-    private boolean demand_pet;
     private int seats_in_car;
     private int demand_seats;
-    private String phone_number;
 
-    // Firebase variables
+    //FireBase
     private FirebaseAuth mAuth;
     private FirebaseUser currentUser;
     private DatabaseReference refUsers;
@@ -99,7 +77,10 @@ public class MainActivity extends AppCompatActivity {
     private GeoFire geoFireDemand;
     private MyGlobalHistory globalHistory;
 
-    // Choose authentication providers for Firebase
+    private String facebookUserId = null;
+    private String photoUrl = null;
+
+    // Choose authentication providers
     List<AuthUI.IdpConfig> authProviders = Arrays.asList(
             //new AuthUI.IdpConfig.Builder(AuthUI.EMAIL_PROVIDER).build(),
             //new AuthUI.IdpConfig.Builder(AuthUI.PHONE_VERIFICATION_PROVIDER).build(),
@@ -108,25 +89,18 @@ public class MainActivity extends AppCompatActivity {
             //new AuthUI.IdpConfig.Builder(AuthUI.TWITTER_PROVIDER).build()
     );
 
-    // Variable that store some user data for quick access
-    private String facebookUserId = null;
-    private Location location = null;
-    private Double latitude = null;
-    private Double longitude = null;
-
-    // UI objects in the layer
     private Button btnLog;
     private Button btnSupply;
     private Button btnDemand;
     private TextView txtShowLocation, txtWelcome;
     private ImageView imProfile;
-    private ImageButton imageButtonSetting;
+    private BroadcastReceiver broadcastReceiverLocationUpdate, broadcastReceiverLocationOff, broadcastReceiverSupplyFound;
+    private Location location = null;
+    private Double latitude = null;
+    private Double longitude = null;
 
-    // BroadcastReceiver (for inter-modules/services communication)
-    private BroadcastReceiver broadcastReceiverLocationUpdate, broadcastReceiverLocionProviderOff, broadcastReceiverSupplyFound;
-
-    // Flags to store various states (yes or no) of the app
-    private boolean flag_login = false;
+    //flag
+    private int flag_login = 0;
     private boolean flag_supply;
     private boolean flag_demand;
 
@@ -134,58 +108,52 @@ public class MainActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         Log.d(TAG, "MAIN_onCreate" );
-        //For Facebook SDK (From Facebook)
+        //For Facebook SDK
         FacebookSdk.sdkInitialize(getApplicationContext());
         AppEventsLogger.activateApp(this);
 
-        //setContentView
         setContentView(R.layout.activity_main);
 
-        //Firebase initialization
+        //For FireBase
         mAuth = FirebaseAuth.getInstance();
+        currentUser = mAuth.getCurrentUser();
         FirebaseDatabase database = FirebaseDatabase.getInstance();
         DatabaseReference myDataBaseRef = database.getReference();
-        //Get pointers to all the nodes/folders of the database
-        refUsers = myDataBaseRef.child(getString(R.string.firebase_folder_users));
-        refSupply = myDataBaseRef.child(getString(R.string.firebase_folder_supply));
-        refDemand = myDataBaseRef.child(getString(R.string.firebase_folder_demand));
-        refHistory = myDataBaseRef.child(getString(R.string.firebase_folder_history));
-        //The geofire folders holds the location coordinates latitude and longitude
-        // encode into a single hash-key with the propriety that 2 closes locations share the
-        // same "code" at the beginning of their keys. The technique is close "Geohashing"
-        // We use the geohashing from the GeoFire library from Google for Firebase
-        geoFireSupply = new GeoFire(myDataBaseRef.child(getString(R.string.firebase_folder_geofire_supply)));
-        geoFireDemand = new GeoFire(myDataBaseRef.child(getString(R.string.firebase_folder_geofire_demand)));
+        //get reference to directories in DB
+        refUsers = myDataBaseRef.child("users/");
+        refSupply = myDataBaseRef.child("supply/");
+        refDemand = myDataBaseRef.child("demand/");
+        refHistory = myDataBaseRef.child("history/");
+        geoFireSupply = new GeoFire(myDataBaseRef.child("geofire/geofire-supply"));
+        geoFireDemand = new GeoFire(myDataBaseRef.child("geofire/geofire-demand"));
         globalHistory = new MyGlobalHistory(refHistory);
 
-        //UI initialization of links
+        //Initialize UI objects and buttons
         txtShowLocation = findViewById(R.id.textView_testCoordinates);
         txtWelcome = findViewById(R.id.textView_welcome_profile);
         btnLog = findViewById(R.id.button_login);
-        btnSupply = findViewById(R.id.button_supply);
-        btnDemand = findViewById(R.id.button_demand);
-        imageButtonSetting = findViewById(R.id.imageButton_settings);
+        btnSupply = findViewById(R.id.button_giveRide);
+        btnDemand = findViewById(R.id.button_findRide);
         imProfile = findViewById(R.id.profile_image);
         //imProfile.setMaxHeight(100);
         //imProfile.setMaxWidth(100);
         imProfile.setScaleType(ImageView.ScaleType.CENTER_CROP);
         imProfile.setCropToPadding(true);
 
-        //Load the sharedPreferences
+        //load the shared preference
         sharedPref = this.getSharedPreferences(
                 getString(R.string.preference_file_key), Context.MODE_PRIVATE);
-        int defaultValue = getResources().getInteger(R.integer.pref_radius_min);
-        radius = sharedPref.getInt(getString(R.string.pref_radius), defaultValue);
+        int defaulRadiustValue = getResources().getInteger(R.integer.pref_radius_min);
+        radius = sharedPref.getInt(getString(R.string.pref_radius), defaulRadiustValue);
         seats_in_car = sharedPref.getInt(getString(R.string.pref_supply_seats_in_car), 1);
-        fuel_price = sharedPref.getInt(getString(R.string.pref_supply_fuel_price), 0);
-        allow_pet_supply = sharedPref.getBoolean(getString(R.string.pref_supply_pet), false);
-        demand_pet = sharedPref.getBoolean(getString(R.string.pref_demand_pet), false);
-        demand_seats = sharedPref.getInt(getString(R.string.pref_demand_seats_in_car), 1);
+        demand_seats = sharedPref.getInt(getString(R.string.pref_supply_seats_in_car), 1);
         flag_supply = sharedPref.getBoolean(getString(R.string.pref_supply_status), false);
         flag_demand = sharedPref.getBoolean(getString(R.string.pref_demand_status), false);
-        phone_number = sharedPref.getString(getString(R.string.pref_phone_number), "false");
+        //writing to log
         Log.d(TAG, "getSharedPreferences : radius = " + radius );
 
+        // Check if user is signed in (non-null) and update UI accordingly.
+        updateUI(currentUser);
     }
 
     @Override
@@ -193,47 +161,44 @@ public class MainActivity extends AppCompatActivity {
         super.onStart();
         Log.d(TAG, "MAIN_onStart" );
 
-        //Check if user is signed in (non-null) and update UI accordingly.
-        currentUser = mAuth.getCurrentUser();
-        updateUI(currentUser);
+        //enable request and supply
+        enableSupplyButton();
+        enableDemandButton();
 
-        // Check permissions at runtime and get them if need to and start firebase service and location service
+        // Check permissions and start service location
         if(!runtimePermissions()) {
-            enableFirebaseAndLocationService();
+            enableLocationService();
         }
+
     }
 
     @Override
     protected void onResume() {
         super.onResume();
         Log.d(TAG, "MAIN_onResume" );
-
-        //Broadcast state of main activity : OnResume
         broadcastOnResume();
-
-        //Initialize (if need is) the broadcastReceivers for location updates and change in providers status
         if(broadcastReceiverLocationUpdate == null){
             broadcastReceiverLocationUpdate = new BroadcastReceiver() {
                 @SuppressLint("SetTextI18n")
                 @Override
                 public void onReceive(Context context, Intent intent) {
-                    Log.d(LocationService.TAG, LocationService.BROADCAST_ACTION_LOCATION_UPDATE);
+                    Log.d(LocationService.TAG, LocationService.BROADCAST_ACTION_LOC_UPDATE );
                     location = (Location)intent.getExtras().get("location");
                     if(location!=null){
                         latitude = location.getLatitude();
                         longitude = location.getLongitude();
-                        //todo deleted the txtShowLocation, it's here only for debug
                         txtShowLocation.setText("Lat :\t"+latitude+"\nLong :\t"+longitude+"\nProvider :\t"+location.getProvider());
                     }
                 }
             };
         }
-        if(broadcastReceiverLocionProviderOff == null){
-            broadcastReceiverLocionProviderOff = new BroadcastReceiver() {
+        if(broadcastReceiverLocationOff == null){
+            broadcastReceiverLocationOff = new BroadcastReceiver() {
                 @Override
                 public void onReceive(Context context, Intent intent) {
-                    Log.d(LocationService.TAG, LocationService.BROADCAST_ACTION_LOCATION_OFF);
-                    if(isAllActiveLocationProvidersDisabled())
+                    Log.d(LocationService.TAG, LocationService.BROADCAST_ACTION_LOC_OFF );
+                    //ask the user to enable location if closed
+                    if(isAllActiveProviderDisabled())
                         showLocationSettingsAlert();
                 }
             };
@@ -245,17 +210,16 @@ public class MainActivity extends AppCompatActivity {
                     String facebookUserIdFound = (String) intent.getExtras().get("facebookUserIdFound");
                     Double latitude = (Double) intent.getExtras().get("geoLocationLatitude");
                     Double longitude = (Double) intent.getExtras().get("geoLocationLongitude");
-
                     Log.d(FirebaseService.TAG, "broadcastReceiverSupplyFound : "+facebookUserIdFound+" "+latitude+" "+longitude );
+                    //go to supply found activity
                     callResultActivity(facebookUserIdFound, latitude, longitude);
                 }
             };
         }
-
-        //Register the broadcastReceivers locally (internal to the app)
+        //register the broadcast receivers
         LocalBroadcastManager localBroadcastManager = LocalBroadcastManager.getInstance(this);
-        localBroadcastManager.registerReceiver(broadcastReceiverLocationUpdate,new IntentFilter(LocationService.BROADCAST_ACTION_LOCATION_UPDATE));
-        localBroadcastManager.registerReceiver(broadcastReceiverLocionProviderOff,new IntentFilter(LocationService.BROADCAST_ACTION_LOCATION_OFF));
+        localBroadcastManager.registerReceiver(broadcastReceiverLocationUpdate,new IntentFilter(LocationService.BROADCAST_ACTION_LOC_UPDATE));
+        localBroadcastManager.registerReceiver(broadcastReceiverLocationOff,new IntentFilter(LocationService.BROADCAST_ACTION_LOC_OFF));
         localBroadcastManager.registerReceiver(broadcastReceiverSupplyFound,new IntentFilter(FirebaseService.BROADCAST_ACTION_SUPPLY_FOUND));
     }
 
@@ -263,17 +227,13 @@ public class MainActivity extends AppCompatActivity {
     protected void onPause() {
         super.onPause();
         Log.d(TAG, "MAIN_onPause" );
-
-        //Broadcast state of main activity : OnPause
         broadcastOnPause();
-
-        //Unregister the broadcastReceivers
         LocalBroadcastManager localBroadcastManager = LocalBroadcastManager.getInstance(this);
         if(broadcastReceiverLocationUpdate != null){
             localBroadcastManager.unregisterReceiver(broadcastReceiverLocationUpdate);
         }
-        if(broadcastReceiverLocionProviderOff != null){
-            localBroadcastManager.unregisterReceiver(broadcastReceiverLocionProviderOff);
+        if(broadcastReceiverLocationOff != null){
+            localBroadcastManager.unregisterReceiver(broadcastReceiverLocationOff);
         }
         if(broadcastReceiverSupplyFound != null){
             localBroadcastManager.unregisterReceiver(broadcastReceiverSupplyFound);
@@ -284,10 +244,8 @@ public class MainActivity extends AppCompatActivity {
     protected void onStop() {
         super.onStop();
         Log.d(TAG, "MAIN_onStop" );
-
-        //If there is no ride demand or supply, then there is no need to keep tracking service on. So stop them
         if(!flag_demand && !flag_supply){
-            //Stop FirebaseService (and FirebaseService will stop LocationService in is onDestroy method)
+            //Stop FirebaseService (and FirebaseService will stop LocationService in its onDestroy method)
             Intent i_stop = new Intent(getApplicationContext(), FirebaseService.class);
             stopService(i_stop);
         }
@@ -302,37 +260,33 @@ public class MainActivity extends AppCompatActivity {
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-        //Result for PERMISSION_LOCATION_REQUEST
         if (requestCode == PERMISSION_LOCATION_REQUEST_CODE) {
             if (grantResults[0] == PackageManager.PERMISSION_GRANTED && grantResults[1] == PackageManager.PERMISSION_GRANTED) {
-                //If got the location permission, enable the location service
-                enableFirebaseAndLocationService();
+                enableLocationService();
             } else {
-                //else (did not get the location permission), keep asking for it
                 runtimePermissions();
             }
         }
     }
 
+    //this method get the result when trying to sign in to facebook
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
         Log.d(TAG, "MAIN_onActivityResult" );
 
-        //Result for sign in with firebase authentication
         if (requestCode == RC_SIGN_IN) {
             IdpResponse response = IdpResponse.fromResultIntent(data);
             if (response != null) {
                 Log.d(TAG, "RC_SIGN_IN_response = " + response.toString());
             }
             if (resultCode == RESULT_OK) {
-                //Successfully signed in
-                //Get the current user, update the UI and add the user to the database if required
+                // Successfully signed in
+                //FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
                 currentUser = mAuth.getCurrentUser();
-                addUserIfNewInFirebaseOrGetSupplyDemandStatusAndPhoneNumberUpdateAndUpdateUI();
                 updateUI(currentUser);
+                addUserIfNewInFireBase();
 
-                //Here down we are logging all the data Firebase Authentication can provide us by curiosity fo development
                 ///////////////////////////////////////////////////////
                 Log.d(TAG, "Successfully signed in = " + currentUser.toString());
                 Log.d(TAG, "Successfully signed in = " + currentUser.getDisplayName());
@@ -348,44 +302,32 @@ public class MainActivity extends AppCompatActivity {
                 Log.d(TAG, "Successfully signed in = " + currentUser.getIdToken(false));
                 Log.d(TAG, "Successfully signed in = " + currentUser.getPhotoUrl());
                 ///////////////////////////////////////////////////////
-
             } else {
                 // Sign in failed, check response for error code
                 Log.d(TAG, "Sign in failed, check response for error code");
                 if (response == null) {
-                    //User pressed back button
-                    Toast.makeText(getApplicationContext(), getString(R.string.toast_sign_in_cancelled),
+                    // User pressed back button
+                    Toast.makeText(getApplicationContext(), "Sign in cancelled by the user",
                             Toast.LENGTH_SHORT).show();
                     return;
                 }
 
                 if (response.getErrorCode() == ErrorCodes.NO_NETWORK) {
-                    //NO_NETWORK
                     Log.d(TAG, "no_internet_connection");
-                    Toast.makeText(getApplicationContext(), getString(R.string.toast_no_internet_connection),
+                    Toast.makeText(getApplicationContext(), "No Internet Connection",
                             Toast.LENGTH_SHORT).show();
                     return;
                 }
 
                 if (response.getErrorCode() == ErrorCodes.UNKNOWN_ERROR) {
-                    //UNKNOWN_ERROR
                     Log.e(TAG, "UNKNOWN_ERROR");
                 }
             }
         }
     }
 
-
-
-
-
-
-
-
-    /**
-     * LogIn: create and launch sign-in intent to the FirebaseAuth "module" (startActivityForResult)
-     */
     private void logInAuth(){
+        // Create and launch sign-in intent from Firebase Auth
         startActivityForResult(
                 AuthUI.getInstance()
                         .createSignInIntentBuilder()
@@ -397,9 +339,6 @@ public class MainActivity extends AppCompatActivity {
                 RC_SIGN_IN);
     }
 
-    /**
-     * LogOut: log out from the FirebaseAuth "module"
-     */
     private void logOutAuth() {
         AuthUI.getInstance()
                 .signOut(this)
@@ -408,47 +347,32 @@ public class MainActivity extends AppCompatActivity {
                         // user is now signed out
                         currentUser = mAuth.getCurrentUser(); //normally =null
                         facebookUserId = null;
-                        flag_supply = false;
-                        flag_demand = false;
-                        SharedPreferences.Editor editor = sharedPref.edit();
-                        editor.putBoolean(getString(R.string.pref_supply_status), flag_supply);
-                        editor.putBoolean(getString(R.string.pref_demand_status), flag_demand);
-                        editor.apply();
-
+                        photoUrl = null;
                         updateUI(currentUser);
                     }
                 });
     }
 
-    /**
-     * initialize the Login button accordingly of the user state (signed in or not)
-     *
-     * @param signed_in The boolean that indicate if the user is already signed in or not for initialization
-     */
-    private void initializeLogButton(boolean signed_in) {
-        //if already signed in
-        if (signed_in){
-            flag_login = true;
+    private void enableLogButton(boolean bool) { //TODO change bool to better name
+        if (bool){ //already signed in
+            flag_login = 1;
             btnLog.setText(R.string.button_logout);
         }
-        //else not already signed in
         else {
-            flag_login = false;
+            flag_login = 0;
             btnLog.setText(R.string.button_login);
         }
-
-        //setOnClickListener for the Log button
         btnLog.setOnClickListener(new View.OnClickListener(){
             @Override
             public void onClick(View view) {
-                if (!flag_login) {
+                if (flag_login == 0) {
                     Button b = (Button) view;
                     b.setText(R.string.button_logout);
-                    flag_login = true;
+                    flag_login = 1;
                     logInAuth();
 
                 } else {
-                    flag_login = false;
+                    flag_login = 0;
                     Button b = (Button) view;
                     b.setText(R.string.button_login);
                     logOutAuth();
@@ -458,31 +382,24 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
-    /**
-     * initialize the Supply button accordingly of the user state (supplying already or not)
-     */
-    private void initializeSupplyButton() {
-        //if already supplying
-        if (flag_supply){
+    private void enableSupplyButton() {
+        if (flag_supply){ //already supplying
             btnSupply.setText(R.string.button_giveRide_cancel);
         }
-        //else not already supplying
         else {
             btnSupply.setText(R.string.button_giveRide);
         }
-
-        //setOnClickListener for the Supply button
         btnSupply.setOnClickListener(new View.OnClickListener(){
             @Override
             public void onClick(View view) {
                 Button b = (Button) view;
                 if (!flag_supply) {
-                    if(addSupplyToFirebase()){
+                    if(addSupplyToFireBase()){
                         flag_supply = true;
                         b.setText(R.string.button_giveRide_cancel);
                     }
                 } else {
-                    if(removeSupplyFromFirebase()) {
+                    if(removeSupplyFromFireBase()) {
                         flag_supply = false;
                         b.setText(R.string.button_giveRide);
                     }
@@ -494,20 +411,13 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
-    /**
-     * initialize the Demand button accordingly of the user state (demanding already or not)
-     */
-    private void initializeDemandButton() {
-        //if already demanding
-        if (flag_demand){
+    private void enableDemandButton() {
+        if (flag_demand){ //already demanding
             btnDemand.setText(R.string.button_findRide_cancel);
         }
-        //else not already demanding
         else {
             btnDemand.setText(R.string.button_findRide);
         }
-
-        //setOnClickListener for the Demand button
         btnDemand.setOnClickListener(new View.OnClickListener(){
             @Override
             public void onClick(View view) {
@@ -530,28 +440,12 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
-    /**
-     * update the UI accordingly of the user state and data (signed in or not, supplying/demanding or not).
-     *  get the profile picture, set the buttons accordingly.
-     *
-     * @param user The FirebaseUser variable that hold the current user metadata (can be null if not logged in)
-     */
-    private void updateUI(FirebaseUser user){//todo initializeLogButton....
-        //if already signed in
+    private void updateUI(FirebaseUser user){
         if(user!=null){
-            //set the UI and initialize the Log Button
-            initializeLogButton(true);
+            //already signed in
             txtWelcome.setText(R.string.ui_welcome_logged_in);
-            txtWelcome.append("\n" + user.getDisplayName());
-
-            //Show the UI for logged in users
-            btnSupply.setVisibility(View.VISIBLE);
-            btnDemand.setVisibility(View.VISIBLE);
-            txtShowLocation.setVisibility(View.VISIBLE);
-            imProfile.setVisibility(View.VISIBLE);
-            imageButtonSetting.setVisibility(View.VISIBLE);
-            btnLog.setVisibility(View.GONE);
-
+            txtWelcome.append(" " + user.getDisplayName());
+            enableLogButton(true);
             // find the Facebook profile and get the user's id
             for(UserInfo profile : currentUser.getProviderData()) {
                 // check if the provider id matches "facebook.com"
@@ -561,8 +455,8 @@ public class MainActivity extends AppCompatActivity {
             }
             // construct the URL to the profile picture, with a custom height
             // alternatively, use '?type=small|medium|large' instead of ?height=500
-            String photoUrl = "https://graph.facebook.com/" + facebookUserId + "/picture?type=large";
-            //Download the profile picture from Facebook (download it in background asynchronously)
+            photoUrl = "https://graph.facebook.com/" + facebookUserId + "/picture?type=large";
+            //new DownloadImageTask(imProfile).execute(photoUrl);
             new DownloadImageTask(new DownloadImageTask.AsyncResponse() {
                 @Override
                 public void processFinish(Bitmap output) {
@@ -570,32 +464,17 @@ public class MainActivity extends AppCompatActivity {
                 }
             }).execute(photoUrl);
         }
-        //else not already signed in
         else{
-            //set the UI and initialize the Log Button
-            initializeLogButton(false);
-            txtWelcome.setText(R.string.ui_welcome_logged_out);
+            enableLogButton(false);
+            txtWelcome.setText(R.string.ui_welcome_logged_in);
             imProfile.setImageResource(R.drawable.com_facebook_profile_picture_blank_square);
-
-            //Hide the UI
-            btnSupply.setVisibility(View.INVISIBLE);
-            btnDemand.setVisibility(View.INVISIBLE);
-            txtShowLocation.setVisibility(View.INVISIBLE);
-            imProfile.setVisibility(View.INVISIBLE);
-            imageButtonSetting.setVisibility(View.INVISIBLE);
-            btnLog.setVisibility(View.VISIBLE);
         }
-
-        //initialize supply and demand button accordingly to the user state
-        initializeSupplyButton();
-        initializeDemandButton();
     }
 
-    /**
-     * enable first the firebase service and then the location service
-    */
-    private void enableFirebaseAndLocationService() {
-
+    //AND ALSO ENABLE FIREBASE SERVICE FIRST !!!
+    private void enableLocationService() {
+        //Toast.makeText(getApplicationContext(), "Location Service ON",
+        //
         Intent i_start_first = new Intent(getApplicationContext(), FirebaseService.class);
         startService(i_start_first);
 
@@ -604,7 +483,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     /**
-     * Checks if we needs permissions on runtime and requests them
+     * Checks if we needs permissions and requests them
      */
     private boolean runtimePermissions() {
         try {
@@ -614,16 +493,16 @@ public class MainActivity extends AppCompatActivity {
                     ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION)
                             != PackageManager.PERMISSION_GRANTED) {
 
-                //if explanation is needed, show dialog accordingly
+                // Check if explanation needed
                 if (ActivityCompat.shouldShowRequestPermissionRationale(MainActivity.this,
                         Manifest.permission.ACCESS_FINE_LOCATION) || ActivityCompat.shouldShowRequestPermissionRationale(
                         MainActivity.this, Manifest.permission.ACCESS_COARSE_LOCATION)) {
 
                     AlertDialog.Builder alertDialog = new AlertDialog.Builder(MainActivity.this);
-                    alertDialog.setTitle(R.string.alert_dialog_permission_location_title);  // Setting Dialog Title
-                    alertDialog.setMessage(R.string.alert_dialog_permission_location_message);     // Setting Dialog Message
-                    // on pressing ok button, we can request the permission.
-                    alertDialog.setPositiveButton(R.string.alert_dialog_ok, new DialogInterface.OnClickListener() {
+                    alertDialog.setTitle("App needs Location permission");  // Setting Dialog Title
+                    alertDialog.setMessage("Grant to location permission or leave the app");     // Setting Dialog Message
+                    // on pressing ok button
+                    alertDialog.setPositiveButton("OK", new DialogInterface.OnClickListener() {
                         public void onClick(DialogInterface dialog, int which) {
                             ActivityCompat.requestPermissions(MainActivity.this,
                                     new String[]{Manifest.permission.ACCESS_COARSE_LOCATION, Manifest.permission.ACCESS_FINE_LOCATION},
@@ -631,16 +510,14 @@ public class MainActivity extends AppCompatActivity {
                         }
                     });
                     // on pressing no button
-                    alertDialog.setNegativeButton(R.string.alert_dialog_permission_location_negative_button, new DialogInterface.OnClickListener() {
+                    alertDialog.setNegativeButton("No", new DialogInterface.OnClickListener() {
                         public void onClick(DialogInterface dialog, int which) {
                             //android.os.Process.killProcess(android.os.Process.myPid());
                             System.exit(0);  // terminates the Linux process and all threads for the app ( so no background)
                         }
                     });
                     alertDialog.show();     // Showing Alert Message
-                }
-                //else, no explanation needed, we can request the permission.
-                else {
+                } else {   // No explanation needed, we can request the permission.
                     ActivityCompat.requestPermissions(MainActivity.this,
                             new String[]{Manifest.permission.ACCESS_COARSE_LOCATION, Manifest.permission.ACCESS_FINE_LOCATION},
                             PERMISSION_LOCATION_REQUEST_CODE);
@@ -656,11 +533,7 @@ public class MainActivity extends AppCompatActivity {
         return false;
     }
 
-    /**
-     * returns true if all active location providers are disabled
-     * returns false otherwise
-     */
-    private boolean isAllActiveLocationProvidersDisabled(){
+    private boolean isAllActiveProviderDisabled(){
         int tot=0;
         LocationManager locMan = (LocationManager) getApplicationContext().getSystemService(Context.LOCATION_SERVICE);
         if(locMan==null)
@@ -701,8 +574,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     /**
-     * start settings activity when the user taps the imageButton_settings
-     * (this function is used in the layout xml file)
+     * Called when the user taps the imageButton_settings
      */
     public void callSettingsActivity(View view) {
         // Explicit Intent by specifying its class name
@@ -712,7 +584,11 @@ public class MainActivity extends AppCompatActivity {
     }
 
     /**
-     * start Result activity and send to it important data for result
+     *
+     * @param facebookUserIdFound
+     * @param latitude
+     * @param longitude
+     *
      */
     public void callResultActivity(String facebookUserIdFound, Double latitude, Double longitude) {
         Intent resultIntent = new Intent(this, ResultActivity.class);
@@ -722,127 +598,10 @@ public class MainActivity extends AppCompatActivity {
         startActivity(resultIntent);
     }
 
-    /**
-     * Get and check the phone number by asking the user (need that currentUser != null) and update the database
-     */
-    public void getOrCheckPhoneNumber() {
-        Log.d(TAG, "getOrCheckPhoneNumber");
-
-        final TelephonyManager manager = (TelephonyManager) this.getSystemService(Context.TELEPHONY_SERVICE);
-        //getNetworkCountryIso
-        assert manager != null;
-        String CountryID= manager.getSimCountryIso().toUpperCase();
-        Log.d(TAG, "getNetworkCountryIso = "+CountryID);
-        final PhoneNumberUtil phoneUtil = PhoneNumberUtil.createInstance(getApplicationContext());
-
-        String prefetch_phone_number = "+";
-        phone_number = sharedPref.getString(getString(R.string.pref_phone_number), "false");
-        if(!Objects.equals(phone_number, "false"))
-            prefetch_phone_number = phone_number;
-        else if(currentUser.getPhoneNumber() != null) {
-            prefetch_phone_number = currentUser.getPhoneNumber();
-            final Phonenumber.PhoneNumber phoneNumber;
-            try {
-                phoneNumber = phoneUtil.parse(prefetch_phone_number, CountryID);
-                prefetch_phone_number = (phoneUtil.format(phoneNumber, PhoneNumberUtil.PhoneNumberFormat.INTERNATIONAL));
-            } catch (NumberParseException e) {
-                e.printStackTrace();
-            }
-        }
-
-        //final Spinner spinnerCountry = new Spinner(this); //todo improvement add a spinner to select country
-
-        final EditText textPhoneNumber = new EditText(this);
-        textPhoneNumber.setHint("Phone number");
-        textPhoneNumber.setText(prefetch_phone_number);
-        textPhoneNumber.addTextChangedListener(new PhoneNumberFormattingTextWatcher(CountryID){
-            boolean flag_reset = false;
-            @Override
-            public synchronized void afterTextChanged(Editable s) {
-                super.afterTextChanged(s);
-                if(s.length()==1 && flag_reset) {
-                    flag_reset = false;
-                    s.clear();
-                }
-                else if(s.length()==0){
-                    s.append("+");
-                }
-                else if(s.length()>1 && !flag_reset) {
-                    flag_reset = true;
-                }
-
-            }
-        });
-        textPhoneNumber.setLines(1);
-        textPhoneNumber.setFilters(new InputFilter[]{new InputFilter.LengthFilter(18)}); // max(here 18) is the max input char for phone number
-        textPhoneNumber.setInputType(InputType.TYPE_CLASS_PHONE);
-        textPhoneNumber.setSelection(textPhoneNumber.getText().length());
-
-
-        AlertDialog.Builder builder = new AlertDialog.Builder(this)
-                .setView(textPhoneNumber)
-                .setTitle(R.string.alert_dialog_phone_number_title)
-                .setMessage(R.string.alert_dialog_phone_number_message)
-                .setPositiveButton(R.string.alert_dialog_ok, null)
-                .setCancelable(false);
-
-        final AlertDialog dialog = builder.create();
-        dialog.show();
-        //Overriding the handler immediately after show
-        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(new View.OnClickListener()
-        {
-            @Override
-            public void onClick(View v)
-            {
-                phone_number = textPhoneNumber.getText().toString();
-
-                //getNetworkCountryIso
-                assert manager != null;
-                String CountryID= manager.getSimCountryIso().toUpperCase();
-                Phonenumber.PhoneNumber forCheckPhoneNumber = phoneUtil.getInvalidExampleNumber(CountryID);
-                try {
-                    forCheckPhoneNumber = phoneUtil.parse(phone_number, CountryID);
-                    Log.d(TAG, "forCheckPhoneNumber" + forCheckPhoneNumber.toString() + " phone_number " + phone_number);
-                } catch (NumberParseException e) {
-                    e.printStackTrace();
-                }
-
-                Log.d(TAG, "forCheckPhoneNumber" + forCheckPhoneNumber.toString());
-                if(phoneUtil.isValidNumber(forCheckPhoneNumber)) {
-                    SharedPreferences.Editor editor = sharedPref.edit();
-                    editor.putString(getString(R.string.pref_phone_number), phone_number);
-                    editor.apply();
-                    refUsers.child(facebookUserId).child("phone").setValue(phone_number);
-
-                    dialog.dismiss();
-                }
-                else {
-                    //else dialog stays open. Make sure you have an obvious way to close the dialog especially if you set cancellable to false.
-                    Toast.makeText(getApplicationContext(), R.string.toast_invalid_phone_number,
-                            Toast.LENGTH_SHORT).show();
-                }
-            }
-        });
-    }
-
-    /**
-     * add user if new in firebase database OR get Supply Demand status and phone number update and update UI
-     * will query the database to find the user, if not found then must be new and then add it
-     * if present in the database, will check the status and the phone number
-     */
-    public void addUserIfNewInFirebaseOrGetSupplyDemandStatusAndPhoneNumberUpdateAndUpdateUI() {
-        Log.d(TAG, "addUserIfNewInFirebaseOrGetSupplyDemandStatusAndPhoneNumberUpdateAndUpdateUI" );
-
-        // find the Facebook profile and get the user's id
-        for(UserInfo profile : currentUser.getProviderData()) {
-            // check if the provider id matches "facebook.com"
-            if(FacebookAuthProvider.PROVIDER_ID.equals(profile.getProviderId())) {
-                facebookUserId = profile.getUid();
-            }
-        }
-
+    public void addUserIfNewInFireBase() {
+        Log.d(TAG, "addUserIfNewInFireBase" );
         if(facebookUserId==null){
-            Toast.makeText(getApplicationContext(), R.string.toast_not_logged_in,
+            Toast.makeText(getApplicationContext(), "ERROR : addNewUserToFirebase\nYou are not logged in\nLog in please",
                     Toast.LENGTH_SHORT).show();
             return;
         }
@@ -851,16 +610,12 @@ public class MainActivity extends AppCompatActivity {
         checkKeyQuery.addListenerForSingleValueEvent(new ValueEventListener() {
             @Override
             public void onDataChange(DataSnapshot dataSnapshot) {
-                Log.d(TAG, "addUserIfNewInFirebaseOrGetSupplyDemandStatusAndPhoneNumberUpdateAndUpdateUI onDataChange" );
+                Log.d(TAG, "addUserIfNewInFireBase onDataChange" );
                 Log.d(TAG, "DATABASE Value is: " + dataSnapshot.toString());
-                //if the user doesn't exist in the database, then add it
                 if(!dataSnapshot.exists()){
-                    getOrCheckPhoneNumber();
-                    addNewUserToFirebase();
+                    addNewUserToFireBase();
                 }
-                //else the user already exist, check Supply/Demand status and update UI and update phone number
                 else {
-                    getOrCheckPhoneNumber();
                     checkSupplyDemandStatusAndUpdateUI();
                 }
             }
@@ -873,27 +628,20 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
-    /**
-     * add new user in firebase database
-     */
-    private void addNewUserToFirebase(){
+    private void addNewUserToFireBase(){
         Log.d(TAG, "addNewUserToFirebase" );
         if(currentUser==null){
-            Toast.makeText(getApplicationContext(), R.string.toast_not_logged_in,
+            Toast.makeText(getApplicationContext(), "ERROR : addNewUserToFirebase\nYou are not logged in\nLog in please",
                     Toast.LENGTH_SHORT).show();
             return;
         }
 
         DatabaseReference myRef = refUsers.child(facebookUserId);
         MyUser myUser = new MyUser(currentUser.getDisplayName(), currentUser.getEmail(),
-                                    phone_number);
+                                    currentUser.getPhoneNumber());
         myRef.setValue(myUser);
     }
 
-    /**
-     * check Supply Demand status and update UI, current user must be logged in to call this function
-     * will query the database to find the user's Supply and Demand status, and will set the flags and buttons accordingly
-     */
     private void checkSupplyDemandStatusAndUpdateUI(){
         Query checkKeyDemandQuery = refDemand.orderByKey().equalTo(facebookUserId);
         checkKeyDemandQuery.addListenerForSingleValueEvent(new ValueEventListener() {
@@ -902,7 +650,7 @@ public class MainActivity extends AppCompatActivity {
                 Log.d(TAG, "DATABASE checkSupplyDemandStatusAndUpdateUI: " + dataSnapshot.toString());
                 if(dataSnapshot.exists()){
                     flag_demand = true;
-                    initializeDemandButton();
+                    enableDemandButton();
                 }
             }
 
@@ -920,7 +668,7 @@ public class MainActivity extends AppCompatActivity {
                 Log.d(TAG, "DATABASE checkSupplyDemandStatusAndUpdateUI: " + dataSnapshot.toString());
                 if(dataSnapshot.exists()){
                     flag_supply = true;
-                    initializeSupplyButton();
+                    enableSupplyButton();
                 }
             }
 
@@ -932,41 +680,58 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
-    /**
-     * add Supply to Firebase
-     */
-    public boolean addSupplyToFirebase() {
+    public boolean addSupplyToFireBase() {
         Log.d(TAG, "addRideToFireBase" );
         if(location==null){
-            Toast.makeText(getApplicationContext(), R.string.toast_no_location_fix,
+            Toast.makeText(getApplicationContext(), "Enable location or wait for location fix",
                     Toast.LENGTH_SHORT).show();
             return false;
         }
         if(currentUser==null){
-            Toast.makeText(getApplicationContext(), R.string.toast_not_logged_in,
+            Toast.makeText(getApplicationContext(), "You are not logged in\nLog in please",
                     Toast.LENGTH_SHORT).show();
             return false;
         }
 
-        setSupplyDetails();
+        chooseNumberSupplyAlert();
 
         return true;
     }
 
+    public void chooseNumberSupplyAlert(){
+        final MySeekBar barNumber1 = new MySeekBar(this);
+        barNumber1.setMax(getResources().getInteger(R.integer.pref_supply_max_seats_in_car)-1);
+        barNumber1.setProgress(seats_in_car-1);
 
-    //todo comments
-    public void setSupplyDetails(){
-        Log.d(TAG, "setSupplyDetails ");
-        DialogFragment newSupplyFragment = SupplyDialogFragment.newInstance(facebookUserId,latitude,longitude);
-        newSupplyFragment.show(getSupportFragmentManager(), "supplyDialogFragment");
+
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.alert_dialog_num_seats_supply_title)
+                .setMessage(R.string.alert_dialog_num_seats_supply_message)
+                .setView(barNumber1)
+                .setPositiveButton(R.string.alert_dialog_ok, new DialogInterface.OnClickListener() {
+                    public void onClick(DialogInterface dialog, int whichButton) {
+                        seats_in_car = (barNumber1.getProgress()+1);
+
+                        SharedPreferences.Editor editor = sharedPref.edit();
+                        editor.putInt(getString(R.string.pref_supply_seats_in_car), seats_in_car);
+                        editor.apply();
+
+                        MySupply mySupply = new MySupply(String.valueOf(seats_in_car));
+                        refSupply.child(facebookUserId).setValue(mySupply);
+                        //FOR TEST TODO change random with the real location
+                        //Double lat = randomLatGen(), lng = randomLngGen();
+                        geoFireSupply.setLocation(facebookUserId, new GeoLocation(latitude, longitude));
+
+                    }
+                })
+                .setCancelable(false)
+                .show();
+
     }
 
-    /**
-     * remove Supply to Firebase
-     */
-    public boolean removeSupplyFromFirebase(){
+    public boolean removeSupplyFromFireBase(){
         if(currentUser==null){
-            Toast.makeText(getApplicationContext(), R.string.toast_not_logged_in,
+            Toast.makeText(getApplicationContext(), "You are not logged in\nLog in please",
                     Toast.LENGTH_SHORT).show();
             return false;
         }
@@ -975,39 +740,54 @@ public class MainActivity extends AppCompatActivity {
         return true;
     }
 
-    /**
-     * add Demand to Firebase
-     */
     public boolean addDemandToFireBase(){
         Log.d(TAG, "addDemandToFireBase" );
         if(location==null){
-            Toast.makeText(getApplicationContext(), R.string.toast_no_location_fix,
+            Toast.makeText(getApplicationContext(), "Enable location or wait for location fix",
                     Toast.LENGTH_SHORT).show();
             return false;
         }
         if(currentUser==null){
-            Toast.makeText(getApplicationContext(), R.string.toast_not_logged_in,
+            Toast.makeText(getApplicationContext(), "You are not logged in\nLog in please",
                     Toast.LENGTH_SHORT).show();
             return false;
         }
 
-        setDemandDetails();
+        chooseNumberDemandAlert();
         return true;
     }
 
-    //todo comments
-    public void setDemandDetails(){
-        Log.d(TAG, "setDemandDetails ");
-        DialogFragment newDemandFragment = DemandDialogFragment.newInstance(facebookUserId,latitude,longitude);
-        newDemandFragment.show(getSupportFragmentManager(), "supplyDialogFragment");
+    public void chooseNumberDemandAlert(){
+        final MySeekBar barNumber2 = new MySeekBar(this);
+        barNumber2.setMax(getResources().getInteger(R.integer.pref_supply_max_seats_in_car)-1);
+        barNumber2.setProgress(demand_seats-1);
+
+
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.alert_dialog_num_seats_demand_title)
+                .setMessage(R.string.alert_dialog_num_seats_demand_message)
+                .setView(barNumber2)
+                .setPositiveButton(R.string.alert_dialog_ok, new DialogInterface.OnClickListener() {
+                    public void onClick(DialogInterface dialog, int whichButton) {
+                        demand_seats = (barNumber2.getProgress()+1);
+
+                        SharedPreferences.Editor editor = sharedPref.edit();
+                        editor.putInt(getString(R.string.pref_demand_seats_in_car), demand_seats);
+                        editor.apply();
+
+                        MyDemand myDemand = new MyDemand(String.valueOf(demand_seats));
+                        refDemand.child(facebookUserId).setValue(myDemand);
+                        geoFireDemand.setLocation(facebookUserId, new GeoLocation(latitude, longitude));
+                        broadcastRequest(true);
+                    }
+                })
+                .setCancelable(false)
+                .show();
     }
 
-    /**
-     * remove Demand to Firebase
-     */
     public boolean removeDemandFromFireBase(){
         if(currentUser==null){
-            Toast.makeText(getApplicationContext(), R.string.toast_not_logged_in,
+            Toast.makeText(getApplicationContext(), "You are not logged in\nLog in please",
                     Toast.LENGTH_SHORT).show();
             return false;
         }
@@ -1017,29 +797,18 @@ public class MainActivity extends AppCompatActivity {
         return true;
     }
 
-    /**
-     * broadcast OnResume locally (internal to the app)
-     */
     private void broadcastOnResume(){
         LocalBroadcastManager localBroadcastManager = LocalBroadcastManager.getInstance(this);
         Intent intent = new Intent(BROADCAST_ACTION_MAIN_RESUME);
         localBroadcastManager.sendBroadcast(intent);
     }
 
-    /**
-     * broadcast OnPause locally (internal to the app)
-     */
     private void broadcastOnPause(){
         LocalBroadcastManager localBroadcastManager = LocalBroadcastManager.getInstance(this);
         Intent intent = new Intent(BROADCAST_ACTION_MAIN_PAUSE);
         localBroadcastManager.sendBroadcast(intent);
     }
 
-    /**
-     * broadcast Request (a change in demand status) locally (internal to the app)
-     *
-     * @param demand_true_or_cancel_false TRUE for the demand has been made, FALSE for the demand has been cancelled
-     */
     private void broadcastRequest(boolean demand_true_or_cancel_false){
         LocalBroadcastManager localBroadcastManager = LocalBroadcastManager.getInstance(this);
         Intent intent = new Intent(BROADCAST_ACTION_MAIN_REQUEST);
@@ -1047,7 +816,63 @@ public class MainActivity extends AppCompatActivity {
         localBroadcastManager.sendBroadcast(intent);
     }
 
-    //todo to delete this part when not needed
+    /*
+    public void addHistoryToFireBase(){
+        //TEST HISTORY
+        String supplyUserId = facebookUserId;
+        Long offeredSeats = new Long(seats_in_car);
+        Long usedSeats = new Long(seats_in_car-demand_seats);
+        Map<String, Long> demandUserId = new HashMap<>();
+        demandUserId.put("Gil", Long.valueOf(1));
+        demandUserId.put("Rivka", Long.valueOf(1));
+        demandUserId.put("Pavel", Long.valueOf(2));
+        demandUserId.put("Moscalej", Long.valueOf(2));
+
+        globalHistory.setGlobalHistory(refHistory.push().getKey(),
+                new GeoLocation(latitude, longitude), new GeoLocation(latitude, longitude),
+                supplyUserId, demandUserId, offeredSeats,usedSeats);
+    }
+    */
+
+    /*
+    public void findRideFromFireBase(){
+        Log.d(TAG, "FIND :");
+        // Read from the database
+        // creates a new query around [37.7832, -122.4056] with a radius of 0.6 kilometers
+        GeoQuery geoQuery = geoFireSupply.queryAtLocation(new GeoLocation(latitude,longitude), radius);
+        geoQuery.addGeoQueryEventListener(new GeoQueryEventListener() {
+            @Override
+            public void onKeyEntered(String key, GeoLocation location) {
+                Log.d(TAG, "FIND : "+String.format("Key %s entered the search area at [%f,%f]", key, location.latitude, location.longitude));
+            }
+
+            @Override
+            public void onKeyExited(String key) {
+                Log.d(TAG, "FIND : "+String.format("Key %s is no longer in the search area", key));
+            }
+
+            @Override
+            public void onKeyMoved(String key, GeoLocation location) {
+                Log.d(TAG, "FIND : "+String.format("Key %s moved within the search area to [%f,%f]", key, location.latitude, location.longitude));
+            }
+
+            @Override
+            public void onGeoQueryReady() {
+                Log.d(TAG, "FIND : "+"All initial data has been loaded and events have been fired!");
+            }
+
+            @Override
+            public void onGeoQueryError(DatabaseError error) {
+                Log.d(TAG, "FIND : "+"There was an error with this query: " + error);
+            }
+        });
+        //geoQuery.removeAllListeners();
+        //Updating the query criteria: The GeoQuery search area can be changed with setCenter and setRadius
+        //You can call either removeGeoQueryEventListener to remove a single event listener or removeAllListeners to remove all event listeners for a GeoQuery
+
+    }
+    */
+
     //FOR TESTING
     public double randomLatGen(){
         double min = latitude-approxLatDelta();
