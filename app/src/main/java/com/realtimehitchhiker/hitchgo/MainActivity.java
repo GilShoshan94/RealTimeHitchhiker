@@ -59,6 +59,7 @@ import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.database.Query;
 import com.google.firebase.database.ValueEventListener;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
@@ -271,13 +272,16 @@ public class MainActivity extends AppCompatActivity implements SupplyDialogFragm
             broadcastReceiverSupplyFound = new BroadcastReceiver() {
                 @Override
                 public void onReceive(Context context, Intent intent) {
-                    Log.d(TAG,"broadcastReceiverSupplyFound : onReceive");
-                    String facebookUserIdFound = (String) intent.getExtras().get("facebookUserIdFound");
-                    Double latitude = (Double) intent.getExtras().get("geoLocationLatitude");
-                    Double longitude = (Double) intent.getExtras().get("geoLocationLongitude");
+                    Log.d(TAG,"broadcastReceiverSupplyFound : onReceive " + intent.toString());
+                    ArrayList<String> resultKey;
+                    ArrayList<ResultLocation> resultLocation;
 
-                    Log.d(FirebaseService.TAG, "broadcastReceiverSupplyFound : "+facebookUserIdFound+" "+latitude+" "+longitude );
-                    callResultActivity(facebookUserIdFound, latitude, longitude);
+                    Bundle bundle = intent.getExtras();
+                    Log.d(TAG,"broadcastReceiverSupplyFound : onReceive " + bundle.toString());
+                    resultKey = bundle.getStringArrayList("facebookUserIdFound");
+                    resultLocation = bundle.getParcelableArrayList("resultLocationFound");
+
+                    callResultActivity(resultKey, resultLocation);
                 }
             };
         }
@@ -759,11 +763,16 @@ public class MainActivity extends AppCompatActivity implements SupplyDialogFragm
     /**
      * start Result activity and send to it important data for result
      */
-    public void callResultActivity(String facebookUserIdFound, Double latitude, Double longitude) {
+    public void callResultActivity(ArrayList<String> resultKey, ArrayList<ResultLocation> resultLocation) {
+        Log.d(TAG, "MAIN_callResultActivity resultKey.isEmpty() = " + resultKey.isEmpty() );
+        Log.d(TAG, "MAIN_callResultActivity resultLocation.isEmpty() = " + resultLocation.isEmpty() );
         Intent resultIntent = new Intent(this, ResultActivity.class);
-        resultIntent.putExtra("facebookUserIdFound", facebookUserIdFound);
-        resultIntent.putExtra("geoLocationLatitude", latitude);
-        resultIntent.putExtra("geoLocationLongitude", longitude);
+
+        Bundle bundle = new Bundle();
+        bundle.putStringArrayList("facebookUserIdFound", resultKey);
+        bundle.putParcelableArrayList("resultLocationFound", resultLocation);
+
+        resultIntent.putExtras(bundle);
         startActivity(resultIntent);
     }
 

@@ -15,7 +15,11 @@ import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.location.Location;
 import android.os.Build;
+import android.os.Bundle;
 import android.os.IBinder;
+import android.os.Parcel;
+import android.os.Parcelable;
+import android.support.v4.app.BundleCompat;
 import android.support.v4.app.NotificationCompat;
 import android.support.v4.app.TaskStackBuilder;
 import android.support.v4.content.LocalBroadcastManager;
@@ -73,8 +77,8 @@ public class FirebaseService extends Service {
     private boolean initialization_flag = true;
 
     //RESULT
-    private List<String> resultKey = new ArrayList<>();
-    private List<GeoLocation> resultGeoLocation = new ArrayList<>();
+    private ArrayList<String> resultKey = new ArrayList<>();
+    private ArrayList<ResultLocation> resultLocation = new ArrayList<>();
 
     //public FirebaseService() {
     //}
@@ -158,7 +162,7 @@ public class FirebaseService extends Service {
             broadcastReceiverLocOff = new BroadcastReceiver() {
                 @Override
                 public void onReceive(Context context, Intent intent) {
-                    // for future improvements could fire a notification asking to enable location again
+                    //todo for future improvements could fire a notification asking to enable location again
                 }
             };
         }
@@ -264,19 +268,9 @@ public class FirebaseService extends Service {
         stopService(i_stop);
     }
 
-    private void buildAndFireNotification(String facebookUserIdFound, GeoLocation location) {
+    private void buildAndFireNotification(ArrayList<String> facebookUserIdFound, ArrayList<ResultLocation> location) {
         Log.d(TAG, "buildAndFire_NOTIFICATION");
         notificationBuilder = new NotificationCompat.Builder(this, channel_id);
-
-        String photoUrl = "https://graph.facebook.com/" + facebookUserIdFound + "/picture?type=small";
-
-        new DownloadImageTask(new DownloadImageTask.AsyncResponse() {
-            @Override
-            public void processFinish(Bitmap output) {
-                notificationBuilder.setLargeIcon(output);
-            }
-        }).execute(photoUrl);
-
         notificationBuilder.setSmallIcon(R.mipmap.ic_launcher)
                 .setContentTitle(getString(R.string.notification_title))
                 .setContentText(getString(R.string.notification_text))
@@ -294,9 +288,12 @@ public class FirebaseService extends Service {
             */
         // Creates an explicit intent for an Activity in your app
         Intent resultIntent = new Intent(this, ResultActivity.class);
-        resultIntent.putExtra("facebookUserIdFound", resultKey.get(0));
-        resultIntent.putExtra("geoLocationLatitude", resultGeoLocation.get(0).latitude);
-        resultIntent.putExtra("geoLocationLongitude", resultGeoLocation.get(0).longitude);
+
+        Bundle bundle = new Bundle();
+        bundle.putStringArrayList("facebookUserIdFound", resultKey);
+        bundle.putParcelableArrayList("resultLocationFound", resultLocation);
+
+        resultIntent.putExtras(bundle);
 
         // The stack builder object will contain an artificial back stack for the
         // started Activity.
@@ -335,7 +332,7 @@ public class FirebaseService extends Service {
             geoQuery = null;
             on_process = false;
             resultKey.clear();
-            resultGeoLocation.clear();
+            resultLocation.clear();
         }
     }
 
@@ -348,8 +345,11 @@ public class FirebaseService extends Service {
             @Override
             public void onKeyEntered(String key, GeoLocation location) {
                 Log.d(TAG, "FIND : "+String.format("Key %s entered the search area at [%f,%f]", key, location.latitude, location.longitude));
-                resultKey.add(key);
-                resultGeoLocation.add(location);
+                if(resultKey.size() < getResources().getInteger(R.integer.pref_max_supply_found)) {
+                    resultKey.add(key);
+                    resultLocation.add(new ResultLocation(location));
+                }
+
                 if(!on_process && resultKey.size() >= getResources().getInteger(R.integer.pref_max_supply_found)){
                     on_process = true;
                     initialization_flag = false;
@@ -365,12 +365,12 @@ public class FirebaseService extends Service {
             public void onKeyExited(String key) {
                 Log.d(TAG, "FIND : "+String.format("Key %s is no longer in the search area", key));
                 int index = resultKey.indexOf(key);
-                if(index==0){
+                resultKey.remove(index);
+                resultLocation.remove(index);
+                if(resultKey.isEmpty()){
                     mNotificationManager.cancel(getResources().getInteger(R.integer.notification_id));
                     on_process = false;
                 }
-                resultKey.remove(index);
-                resultGeoLocation.remove(index);
             }
 
             @Override
@@ -402,15 +402,18 @@ public class FirebaseService extends Service {
     }
 
     private void processResult(){
-        //todo ... check data...
+        //todo ... check data... remove if not enough seats...
         if(main_activity_is_on){
-            Log.d(TAG, "processResult activity ON : " + main_activity_is_on);
+            Log.d(TAG, "processResult activity ON");
 
             LocalBroadcastManager localBroadcastManager = LocalBroadcastManager.getInstance(this);
             Intent intent = new Intent(BROADCAST_ACTION_SUPPLY_FOUND);
-            intent.putExtra("facebookUserIdFound", resultKey.get(0));
-            intent.putExtra("geoLocationLatitude", resultGeoLocation.get(0).latitude);
-            intent.putExtra("geoLocationLongitude", resultGeoLocation.get(0).longitude);
+
+            Bundle bundle = new Bundle();
+            bundle.putStringArrayList("facebookUserIdFound", new ArrayList<>(resultKey));
+            bundle.putParcelableArrayList("resultLocationFound", new ArrayList<>(resultLocation));//todo
+
+            intent.putExtras(bundle);
             localBroadcastManager.sendBroadcast(intent);
 
             if(geoQuery!=null) {
@@ -418,12 +421,13 @@ public class FirebaseService extends Service {
             }
             geoQuery = null;
             on_process = false;
+            //todo should I clear or not...
             resultKey.clear();
-            resultGeoLocation.clear();
+            resultLocation.clear();
         }
         else{
             Log.d(TAG, "processResult activity OFF");
-            buildAndFireNotification(resultKey.get(0), resultGeoLocation.get(0));
+            buildAndFireNotification(resultKey, resultLocation);
         }
     }
 

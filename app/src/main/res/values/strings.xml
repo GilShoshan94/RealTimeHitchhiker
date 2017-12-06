@@ -96,6 +96,8 @@
     <string name="result">Drive confirmation</string>
     <string name="button_result_call">Call driver</string>
     <string name="textview_result">Your driver is </string>
+    <string name="button_next" translatable="false">\u003E</string>
+    <string name="button_prev" translatable="false">\u003C</string>
 
     <!-- Example General settings (not in use)-->
     <string name="pref_header_general">General</string>
