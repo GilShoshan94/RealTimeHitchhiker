@@ -66,7 +66,7 @@ public class FirebaseService extends Service {
     private LocalBroadcastManager localBroadcastManager;
     private BroadcastReceiver broadcastReceiverLocUpdate, broadcastReceiverLocOff, broadcastReceiverRadiusUpdate;
     private BroadcastReceiver broadcastReceiverMainResume, broadcastReceiverMainPause, broadcastReceiverMainRequest;
-    private Double latitude = null, longitude = null;
+    private Double latitude = 90.0, longitude = 0.0;
     private SharedPreferences sharedPref;
     private int radius; // in meters
 
@@ -135,7 +135,7 @@ public class FirebaseService extends Service {
     }
 
     @Override
-    public int onStartCommand(Intent intent, int flags, int startId) {
+    public int onStartCommand(Intent intent, int flags, int startId) {//todo add lat lng in intent to initialize
         super.onStartCommand(intent, flags, startId);
         Log.d(TAG, "onStartCommand");
         if(broadcastReceiverLocUpdate == null){
@@ -337,7 +337,7 @@ public class FirebaseService extends Service {
     }
 
     public void findRideFromFireBase(){
-        Log.d(TAG, "FIND :  with radius = " + radius);
+        Log.d(TAG, "FIND :  with radius = " + radius + "\nFIND : latitude, longitude" + latitude.toString() + ", " + longitude.toString());
         // Read from the database
         // creates a new query around [latitude, longitude] with a radius of "radius" kilometers
         geoQuery = geoFireSupply.queryAtLocation(new GeoLocation(latitude,longitude), radius);
