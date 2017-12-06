@@ -30,12 +30,14 @@
     <string name="pref_supply_fuel_price" translatable="false">supplyFuelPriceInt</string>
     <string name="pref_supply_pet" translatable="false">supplyPetBool</string>
     <string name="pref_demand_pet" translatable="false">demandPetBool</string>
+    <string name="pref_language" translatable="false">languageString</string>
+
 
     <!-- Notification -->
     <string name="channel_id" translatable="false">com.realtimehitchhiker.hitchgo.NOTIFICATION_CHANNEL_ID</string>
     <string name="channel_name" translatable="false">HitchGo notification</string>
     <string name="channel_description" translatable="false">HitchGo NOTIFICATION_CHANNEL</string>
-    <string name="notification_title">HitchGo found a tramp !</string>
+    <string name="notification_title">HitchGo found a ride !</string>
     <string name="notification_text">Click here to confirm</string>
 
     <!-- MAIN -->
@@ -65,6 +67,11 @@
     <string name="toast_not_logged_in">You are not logged in\nLog in please</string>
     <string name="toast_no_location_fix">Enable location or wait for location fix</string>
     <string name="toast_invalid_phone_number">Invalid phone number</string>
+    <!-- Spinner language -->
+    <string-array name="languages" translatable="false">
+        <item>English</item>
+        <item>עיברית</item>
+    </string-array>
 
     <!-- DialogSettings -->
     <string name="button_plus" translatable="false">+</string>

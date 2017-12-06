@@ -10,6 +10,8 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
+import android.content.res.Configuration;
+import android.content.res.Resources;
 import android.graphics.Bitmap;
 import android.location.Location;
 import android.location.LocationManager;
@@ -26,12 +28,15 @@ import android.telephony.TelephonyManager;
 import android.text.Editable;
 import android.text.InputFilter;
 import android.text.InputType;
+import android.util.DisplayMetrics;
 import android.util.Log;
 import android.view.View;
+import android.widget.AdapterView;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.ImageView;
+import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -56,6 +61,7 @@ import com.google.firebase.database.ValueEventListener;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -120,6 +126,7 @@ public class MainActivity extends AppCompatActivity implements SupplyDialogFragm
     private TextView txtShowLocation, txtWelcome;
     private ImageView imProfile;
     private ImageButton imageButtonSetting;
+    private Spinner spinnerLanguage;
 
     // BroadcastReceiver (for inter-modules/services communication)
     private BroadcastReceiver broadcastReceiverLocationUpdate, broadcastReceiverLocionProviderOff, broadcastReceiverSupplyFound;
@@ -139,6 +146,9 @@ public class MainActivity extends AppCompatActivity implements SupplyDialogFragm
 
         //setContentView
         setContentView(R.layout.activity_main);
+
+        //Normally would use this to initialize the language but the Spinner in onStart does it anyway...
+        //LocaleUtils.initialize(this);
 
         //Firebase initialization
         mAuth = FirebaseAuth.getInstance();
@@ -169,6 +179,7 @@ public class MainActivity extends AppCompatActivity implements SupplyDialogFragm
         //imProfile.setMaxWidth(100);
         imProfile.setScaleType(ImageView.ScaleType.CENTER_CROP);
         imProfile.setCropToPadding(true);
+        spinnerLanguage = findViewById(R.id.spinner_language);
 
         //Load the sharedPreferences
         sharedPref = this.getSharedPreferences(
@@ -191,6 +202,25 @@ public class MainActivity extends AppCompatActivity implements SupplyDialogFragm
     protected void onStart() {
         super.onStart();
         Log.d(TAG, "MAIN_onStart" );
+
+        //set the spinner language listener :
+        spinnerLanguage.setSelection(LocaleUtils.getPersistedDataPosition(this));
+        spinnerLanguage.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            public void onItemSelected(AdapterView<?> parent, View view,
+                                       int pos, long id) {
+                Log.d("LOCAL_UTILS", "spinner pos = " + pos);
+                if (pos == 0) {//English
+                    LocaleUtils.setLocale(MainActivity.this,LocaleUtils.ENGLISH);
+                    updateUI(currentUser);
+                } else if (pos == 1) {//Hebrew
+                    LocaleUtils.setLocale(MainActivity.this,LocaleUtils.HEBREW);
+                    updateUI(currentUser);
+                }
+            }
+            public void onNothingSelected(AdapterView<?> arg0) {
+                // do nothing
+            }
+        });
 
         // Check permissions at runtime and get them if need to and start firebase service and location service
         if(!runtimePermissions()) {
@@ -375,8 +405,6 @@ public class MainActivity extends AppCompatActivity implements SupplyDialogFragm
             }
         }
     }
-
-
 
 
 

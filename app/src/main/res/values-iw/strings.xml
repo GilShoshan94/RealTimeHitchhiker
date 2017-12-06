@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">HitchGo</string>
+    <string name="button_demand">לבקש נסיעה</string>
+    <string name="button_demand_cancel">"בטל בקשה "</string>
+    <string name="button_supply">לספק טרמפ</string>
+    <string name="button_supply_cancel">"ביטול טרמפ "</string>
+    <string name="button_login">"התחברות "</string>
+    <string name="button_logout">"להתנתק "</string>
+    <string name="settings_radius">רדיוס</string>
+</resources>
