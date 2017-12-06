@@ -34,6 +34,7 @@ import com.google.firebase.database.FirebaseDatabase;
 import java.util.ArrayList;
 import java.util.List;
 
+
 /**
  * This is the Firebase Service class
  * It connect the app to the Firebase database and listen to change occurring into it
@@ -173,8 +174,8 @@ public class FirebaseService extends Service {
                             geoQuery.setRadius(radius);
                         }
                     }
-            }
-        };
+                }
+            };
         }
         if(broadcastReceiverMainResume == null){
             broadcastReceiverMainResume = new BroadcastReceiver() {

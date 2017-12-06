@@ -93,7 +93,7 @@ public class DemandDialogFragment extends DialogFragment {
         super.onCreate(savedInstanceState);
         facebookUserId = getArguments().getString("facebookUserId","-1");
         latitude = getArguments().getDouble("latitude",90.0);
-        longitude = getArguments().getDouble("latitude",0.0);
+        longitude = getArguments().getDouble("longitude",0.0);
 
         DatabaseReference myDataBaseRef = FirebaseDatabase.getInstance().getReference();
         refDemand = myDataBaseRef.child(getString(R.string.firebase_folder_demand));

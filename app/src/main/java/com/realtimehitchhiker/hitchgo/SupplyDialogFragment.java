@@ -98,7 +98,7 @@ public class SupplyDialogFragment extends DialogFragment implements CounterHandl
         super.onCreate(savedInstanceState);
         facebookUserId = getArguments().getString("facebookUserId","-1");
         latitude = getArguments().getDouble("latitude",90.0);
-        longitude = getArguments().getDouble("latitude",0.0);
+        longitude = getArguments().getDouble("longitude",0.0);
 
         DatabaseReference myDataBaseRef = FirebaseDatabase.getInstance().getReference();
         refSupply = myDataBaseRef.child(getString(R.string.firebase_folder_supply));
