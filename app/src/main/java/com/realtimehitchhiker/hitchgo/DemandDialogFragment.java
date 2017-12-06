@@ -22,6 +22,8 @@ import com.firebase.geofire.GeoLocation;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
 
+import java.util.Objects;
+
 /**
  * Created by gilshoshan on 04-Dec-17.
  */
@@ -46,6 +48,8 @@ public class DemandDialogFragment extends DialogFragment {
     private TextView txtSeatsDemand;
     private CheckBox checkBoxPetDemand;
 
+    // The activity that creates an instance of this dialog fragment must implement this interface
+    // It's to pass parameters
     public static DemandDialogFragment newInstance(String facebookUserId, Double latitude, Double longitude) {
 
         Bundle args = new Bundle();
@@ -56,6 +60,32 @@ public class DemandDialogFragment extends DialogFragment {
         DemandDialogFragment fragment = new DemandDialogFragment();
         fragment.setArguments(args);
         return fragment;
+    }
+
+    /* The activity that creates an instance of this dialog fragment must
+     * implement this interface in order to receive event callbacks.
+     * Each method passes the DialogFragment in case the host needs to query it. */
+    public interface DemandDialogListener {
+        void onDemandDialogPositiveClick(DialogFragment dialog);
+        void onDemandDialogNegativeClick(DialogFragment dialog);
+    }
+
+    // Use this instance of the interface to deliver action events
+    DemandDialogListener mListener;
+
+    // Override the Fragment.onAttach() method to instantiate the NoticeDialogListener
+    @Override
+    public void onAttach(Context context) {
+        super.onAttach(context);
+        // Verify that the host activity implements the callback interface
+        try {
+            // Instantiate the NoticeDialogListener so we can send events to the host
+            mListener = (DemandDialogListener) context;
+        } catch (ClassCastException e) {
+            // The activity doesn't implement the interface, throw exception
+            throw new ClassCastException(context.toString()
+                    + " must implement NoticeDialogListener");
+        }
     }
 
     @Override
@@ -99,6 +129,9 @@ public class DemandDialogFragment extends DialogFragment {
 
                         demand_pet = checkBoxPetDemand.isChecked();
                         String destination = txtDestination.getText().toString();
+                        //todo destination validation...
+                        if(Objects.equals(destination, "") || Objects.equals(destination, " "))
+                            destination = "Forgot to tell...";
 
                         SharedPreferences.Editor editor = sharedPref.edit();
                         editor.putInt(getString(R.string.pref_demand_seats_in_car), demand_seats);
@@ -109,6 +142,8 @@ public class DemandDialogFragment extends DialogFragment {
                         refDemand.child(facebookUserId).setValue(myDemand);
                         geoFireDemand.setLocation(facebookUserId, new GeoLocation(latitude, longitude));
 
+                        // Send the positive button event back to the host activity
+                        mListener.onDemandDialogPositiveClick(DemandDialogFragment.this);
                     }
                 })
                 .setNegativeButton(R.string.alert_dialog_cancel, new DialogInterface.OnClickListener() {
@@ -120,12 +155,15 @@ public class DemandDialogFragment extends DialogFragment {
                         editor.putInt(getString(R.string.pref_demand_seats_in_car), demand_seats);
                         editor.putBoolean(getString(R.string.pref_demand_pet), demand_pet);
                         editor.apply();
+
+                        // Send the positive button event back to the host activity
+                        mListener.onDemandDialogNegativeClick(DemandDialogFragment.this);
                     }
                 })
                 .setCancelable(false);
 
         //UI initialization of links
-        txtDestination = dialogView.findViewById(R.id.editText_destination);
+        txtDestination = dialogView.findViewById(R.id.editText_destination_demand);
 
         txtSeatsDemand = dialogView.findViewById(R.id.textView_seats_demand);
         Button btnPlusSeats = dialogView.findViewById(R.id.button_seats_demand_plus);

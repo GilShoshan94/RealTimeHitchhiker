@@ -1,9 +1,14 @@
 package com.realtimehitchhiker.hitchgo;
 
+import android.Manifest;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
+import android.net.Uri;
+import android.support.annotation.NonNull;
+import android.support.v4.app.ActivityCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
@@ -27,10 +32,12 @@ import com.google.firebase.database.ValueEventListener;
 
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Objects;
 
 public class ResultActivity extends AppCompatActivity {
     public static final String TAG = "RESULT_DEBUG";
+    private static final int MY_PERMISSIONS_REQUEST_CALL_PHONE =1;
+
+    private String phone = "tel:0377778888";
 
     //FireBase
     private FirebaseAuth mAuth;
@@ -43,12 +50,12 @@ public class ResultActivity extends AppCompatActivity {
     private GeoFire geoFireDemand;
     private MyGlobalHistory globalHistory;
 
-    private Button btnResultOk;
+    private Button btnCall;
     private TextView txtShowDriver;
     private ImageView imProfile;
 
     private String facebookUserIdFound, facebookUserId;
-    private Double latitude, longitude;
+    private Double latitudeFound, longitudeFound;
     private String  requestingSeats="0", remainingSeats="0";
 
     private SharedPreferences sharedPref;
@@ -69,10 +76,10 @@ public class ResultActivity extends AppCompatActivity {
         // Get the Intent that started this activity and extract the string
         Intent intent = getIntent();
         facebookUserIdFound = (String) intent.getExtras().get("facebookUserIdFound");
-        latitude = (Double) intent.getExtras().get("geoLocationLatitude");
-        longitude = (Double) intent.getExtras().get("geoLocationLongitude");
+        latitudeFound = (Double) intent.getExtras().get("geoLocationLatitude");
+        longitudeFound = (Double) intent.getExtras().get("geoLocationLongitude");
 
-        btnResultOk = findViewById(R.id.button_result);
+        btnCall = findViewById(R.id.button_call);
         txtShowDriver = findViewById(R.id.textView_result);
         imProfile = findViewById(R.id.imageView_result);
 
@@ -106,6 +113,46 @@ public class ResultActivity extends AppCompatActivity {
         //Stop FirebaseService (and FirebaseService will stop LocationService in is onDestroy method)
         Intent i_stop = new Intent(getApplicationContext(), FirebaseService.class);
         stopService(i_stop);
+    }
+
+    //this function get called when you press the phone number button
+    //it creates intent to call the number appears on the button and asks permission if needed
+    public void callPhoneNumberSupply(View view) {
+        String phoneNumber = "tel:0587618037"; //todo
+        //String phoneNumber = view.getTag().toString();
+        Intent callIntent = new Intent(Intent.ACTION_DIAL);
+        callIntent.setData(Uri.parse(phoneNumber));
+        if (ActivityCompat.checkSelfPermission(this,
+                Manifest.permission.CALL_PHONE) != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this,
+                    new String[]{Manifest.permission.CALL_PHONE},
+                    MY_PERMISSIONS_REQUEST_CALL_PHONE);
+
+        } else {
+            startActivity(callIntent);
+        }
+    }
+
+    //When the user responds to permission request, the system invokes your app's onRequestPermissionsResult() method.
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        switch (requestCode) {
+            case MY_PERMISSIONS_REQUEST_CALL_PHONE: {
+                // If request is cancelled, the result arrays are empty.
+                if (grantResults.length > 0
+                        && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                    callPhoneNumberSupply(btnCall);
+                    // permission was granted, yay!
+                } else {
+                    // permission denied, boo! Disable the
+                    // functionality that depends on this permission.
+                }
+                return;
+            }
+            // other 'case' lines to check for other
+            // permissions this app might request
+        }
     }
 
     public void updateFireBasDataBase(){
@@ -194,8 +241,8 @@ public class ResultActivity extends AppCompatActivity {
         String demandName = currentUser.getDisplayName();
         demandUserId.put(demandName, requestingSeats);
 
-        globalHistory.setGlobalHistory(refHistory.push().getKey(),
-                new GeoLocation(latitude, longitude), new GeoLocation(latitude, longitude),
+        globalHistory.setGlobalHistory(refHistory.push().getKey(),//todo...
+                new GeoLocation(latitudeFound, longitudeFound), new GeoLocation(latitudeFound, longitudeFound),
                 supplyUserId, demandUserId, remainingSeats, requestingSeats);
     }
 

@@ -39,10 +39,10 @@
     <string name="notification_text">Click here to confirm</string>
 
     <!-- MAIN -->
-    <string name="button_findRide">Request a ride</string>
-    <string name="button_findRide_cancel">Cancel Request a ride</string>
-    <string name="button_giveRide">Supply a ride</string>
-    <string name="button_giveRide_cancel">Cancel supply</string>
+    <string name="button_demand">Request a ride</string>
+    <string name="button_demand_cancel">Cancel request</string>
+    <string name="button_supply">Supply a ride</string>
+    <string name="button_supply_cancel">Cancel supply</string>
     <string name="button_login">Login</string>
     <string name="button_logout">Logout</string>
     <string name="alert_dialog_ok">OK</string>
@@ -87,7 +87,7 @@
 
     <!-- Result -->
     <string name="result">Drive confirmation</string>
-    <string name="button_result">Yay !</string>
+    <string name="button_result_call">Call driver</string>
     <string name="textview_result">Your driver is </string>
 
     <!-- Example General settings (not in use)-->

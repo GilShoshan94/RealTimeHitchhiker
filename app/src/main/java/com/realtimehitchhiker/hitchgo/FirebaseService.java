@@ -58,6 +58,7 @@ public class FirebaseService extends Service {
     private GeoQuery geoQuery = null;
     private MyGlobalHistory globalHistory;
 
+    private LocalBroadcastManager localBroadcastManager;
     private BroadcastReceiver broadcastReceiverLocUpdate, broadcastReceiverLocOff, broadcastReceiverRadiusUpdate;
     private BroadcastReceiver broadcastReceiverMainResume, broadcastReceiverMainPause, broadcastReceiverMainRequest;
     private Double latitude = null, longitude = null;
@@ -207,13 +208,16 @@ public class FirebaseService extends Service {
             };
         }
 
-        LocalBroadcastManager localBroadcastManager = LocalBroadcastManager.getInstance(this);
-        localBroadcastManager.registerReceiver(broadcastReceiverLocUpdate,new IntentFilter(LocationService.BROADCAST_ACTION_LOCATION_UPDATE));
-        localBroadcastManager.registerReceiver(broadcastReceiverLocOff,new IntentFilter(LocationService.BROADCAST_ACTION_LOCATION_OFF));
-        localBroadcastManager.registerReceiver(broadcastReceiverRadiusUpdate,new IntentFilter(SettingsActivity.BROADCAST_ACTION_RADIUS_UPDATE));
-        localBroadcastManager.registerReceiver(broadcastReceiverMainResume,new IntentFilter(MainActivity.BROADCAST_ACTION_MAIN_RESUME));
-        localBroadcastManager.registerReceiver(broadcastReceiverMainPause,new IntentFilter(MainActivity.BROADCAST_ACTION_MAIN_PAUSE));
-        localBroadcastManager.registerReceiver(broadcastReceiverMainRequest,new IntentFilter(MainActivity.BROADCAST_ACTION_MAIN_REQUEST));
+        if(localBroadcastManager == null) {
+            localBroadcastManager = LocalBroadcastManager.getInstance(this);
+            localBroadcastManager.registerReceiver(broadcastReceiverLocUpdate, new IntentFilter(LocationService.BROADCAST_ACTION_LOCATION_UPDATE));
+            localBroadcastManager.registerReceiver(broadcastReceiverLocOff, new IntentFilter(LocationService.BROADCAST_ACTION_LOCATION_OFF));
+            localBroadcastManager.registerReceiver(broadcastReceiverRadiusUpdate, new IntentFilter(SettingsActivity.BROADCAST_ACTION_RADIUS_UPDATE));
+            localBroadcastManager.registerReceiver(broadcastReceiverMainResume, new IntentFilter(MainActivity.BROADCAST_ACTION_MAIN_RESUME));
+            localBroadcastManager.registerReceiver(broadcastReceiverMainPause, new IntentFilter(MainActivity.BROADCAST_ACTION_MAIN_PAUSE));
+            localBroadcastManager.registerReceiver(broadcastReceiverMainRequest, new IntentFilter(MainActivity.BROADCAST_ACTION_MAIN_REQUEST));
+        }
+
         return START_STICKY;
     }
 
@@ -225,6 +229,7 @@ public class FirebaseService extends Service {
     @Override
     public void onDestroy() {
         super.onDestroy();
+        Log.d(TAG, "onDestroy");
 
         if(geoQuery!=null) {
             geoQuery.removeAllListeners();
@@ -334,9 +339,9 @@ public class FirebaseService extends Service {
     }
 
     public void findRideFromFireBase(){
-        Log.d(TAG, "FIND :");
+        Log.d(TAG, "FIND :  with radius = " + radius);
         // Read from the database
-        // creates a new query around [37.7832, -122.4056] with a radius of 0.6 kilometers
+        // creates a new query around [latitude, longitude] with a radius of "radius" kilometers
         geoQuery = geoFireSupply.queryAtLocation(new GeoLocation(latitude,longitude), radius);
         geoQuery.addGeoQueryEventListener(new GeoQueryEventListener() {
             @Override
@@ -396,6 +401,7 @@ public class FirebaseService extends Service {
     }
 
     private void processResult(){
+        //todo ... check data...
         if(main_activity_is_on){
             Log.d(TAG, "processResult activity ON : " + main_activity_is_on);
 

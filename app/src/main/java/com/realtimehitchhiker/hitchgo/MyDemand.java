@@ -7,17 +7,17 @@ package com.realtimehitchhiker.hitchgo;
 class MyDemand {
     public String destination;
     public int requestingSeats;
-    public boolean hasAllowed;
+    public boolean hasPet;
     public Long timeStamp;
 
     public MyDemand() {
         // Default constructor required for calls to DataSnapshot.getValue(User.class)
     }
 
-    MyDemand(String destination, int requestingSeats, boolean hasAllowed) {
+    MyDemand(String destination, int requestingSeats, boolean hasPet) {
         this.destination = destination;
         this.requestingSeats = requestingSeats;
-        this.hasAllowed = hasAllowed;
+        this.hasPet = hasPet;
         timeStamp = System.currentTimeMillis();
     }
 }

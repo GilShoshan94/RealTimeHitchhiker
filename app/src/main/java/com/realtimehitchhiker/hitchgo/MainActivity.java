@@ -32,7 +32,6 @@ import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.ImageView;
-import android.widget.RelativeLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -67,7 +66,7 @@ import io.michaelrocks.libphonenumber.android.Phonenumber;
 /**
  * THis is the main activity of the app
  */
-public class MainActivity extends AppCompatActivity {
+public class MainActivity extends AppCompatActivity implements SupplyDialogFragment.SupplyDialogListener, DemandDialogFragment.DemandDialogListener {
     // The static final Strings
     public static final String BROADCAST_ACTION_MAIN_RESUME = "com.realtimehitchhiker.hitchgo.MAIN_RESUME";
     public static final String BROADCAST_ACTION_MAIN_PAUSE = "com.realtimehitchhiker.hitchgo.MAIN_PAUSE";
@@ -193,14 +192,13 @@ public class MainActivity extends AppCompatActivity {
         super.onStart();
         Log.d(TAG, "MAIN_onStart" );
 
-        //Check if user is signed in (non-null) and update UI accordingly.
-        currentUser = mAuth.getCurrentUser();
-        updateUI(currentUser);
-
         // Check permissions at runtime and get them if need to and start firebase service and location service
         if(!runtimePermissions()) {
             enableFirebaseAndLocationService();
         }
+        //Check if user is signed in (non-null) and update UI accordingly. And stop the services if user is signed out
+        currentUser = mAuth.getCurrentUser();
+        updateUI(currentUser);
     }
 
     @Override
@@ -239,9 +237,11 @@ public class MainActivity extends AppCompatActivity {
             };
         }
         if(broadcastReceiverSupplyFound == null) {
+            Log.d(TAG,"broadcastReceiverSupplyFound : INITIALIZE");
             broadcastReceiverSupplyFound = new BroadcastReceiver() {
                 @Override
                 public void onReceive(Context context, Intent intent) {
+                    Log.d(TAG,"broadcastReceiverSupplyFound : onReceive");
                     String facebookUserIdFound = (String) intent.getExtras().get("facebookUserIdFound");
                     Double latitude = (Double) intent.getExtras().get("geoLocationLatitude");
                     Double longitude = (Double) intent.getExtras().get("geoLocationLongitude");
@@ -284,19 +284,20 @@ public class MainActivity extends AppCompatActivity {
     protected void onStop() {
         super.onStop();
         Log.d(TAG, "MAIN_onStop" );
-
-        //If there is no ride demand or supply, then there is no need to keep tracking service on. So stop them
-        if(!flag_demand && !flag_supply){
-            //Stop FirebaseService (and FirebaseService will stop LocationService in is onDestroy method)
-            Intent i_stop = new Intent(getApplicationContext(), FirebaseService.class);
-            stopService(i_stop);
-        }
     }
 
     @Override
     protected void onDestroy() {
         super.onDestroy();
         Log.d(TAG, "MAIN_onDestroy" );
+
+        //If there is no ride demand or supply, then there is no need to keep tracking service on. So stop them
+        if(!flag_demand && !flag_supply){
+            //Stop FirebaseService (and FirebaseService will stop LocationService in is onDestroy method)
+            Intent i_stop = new Intent(getApplicationContext(), FirebaseService.class);
+            Log.d(TAG, "stopService : onDestroy");
+            stopService(i_stop);
+        }
     }
 
     @Override
@@ -464,11 +465,13 @@ public class MainActivity extends AppCompatActivity {
     private void initializeSupplyButton() {
         //if already supplying
         if (flag_supply){
-            btnSupply.setText(R.string.button_giveRide_cancel);
+            btnSupply.setText(R.string.button_supply_cancel);
+            btnDemand.setEnabled(false);
         }
         //else not already supplying
         else {
-            btnSupply.setText(R.string.button_giveRide);
+            btnSupply.setText(R.string.button_supply);
+            btnDemand.setEnabled(true);
         }
 
         //setOnClickListener for the Supply button
@@ -477,19 +480,17 @@ public class MainActivity extends AppCompatActivity {
             public void onClick(View view) {
                 Button b = (Button) view;
                 if (!flag_supply) {
-                    if(addSupplyToFirebase()){
-                        flag_supply = true;
-                        b.setText(R.string.button_giveRide_cancel);
-                    }
+                    addSupplyToFirebase();
                 } else {
                     if(removeSupplyFromFirebase()) {
                         flag_supply = false;
-                        b.setText(R.string.button_giveRide);
+                        b.setText(R.string.button_supply);
+
+                        SharedPreferences.Editor editor = sharedPref.edit();
+                        editor.putBoolean(getString(R.string.pref_supply_status), flag_supply);
+                        editor.apply();
                     }
                 }
-                SharedPreferences.Editor editor = sharedPref.edit();
-                editor.putBoolean(getString(R.string.pref_supply_status), flag_supply);
-                editor.apply();
             }
         });
     }
@@ -500,11 +501,13 @@ public class MainActivity extends AppCompatActivity {
     private void initializeDemandButton() {
         //if already demanding
         if (flag_demand){
-            btnDemand.setText(R.string.button_findRide_cancel);
+            btnDemand.setText(R.string.button_demand_cancel);
+            btnSupply.setEnabled(false);
         }
         //else not already demanding
         else {
-            btnDemand.setText(R.string.button_findRide);
+            btnDemand.setText(R.string.button_demand);
+            btnSupply.setEnabled(true);
         }
 
         //setOnClickListener for the Demand button
@@ -513,19 +516,17 @@ public class MainActivity extends AppCompatActivity {
             public void onClick(View view) {
                 Button b = (Button) view;
                 if (!flag_demand) {
-                    if(addDemandToFireBase()){
-                        flag_demand = true;
-                        b.setText(R.string.button_findRide_cancel);
-                    }
+                    addDemandToFireBase();
                 } else {
                     if(removeDemandFromFireBase()){
                         flag_demand = false;
-                        b.setText(R.string.button_findRide);
+                        b.setText(R.string.button_demand);
+
+                        SharedPreferences.Editor editor = sharedPref.edit();
+                        editor.putBoolean(getString(R.string.pref_demand_status), flag_demand);
+                        editor.apply();
                     }
                 }
-                SharedPreferences.Editor editor = sharedPref.edit();
-                editor.putBoolean(getString(R.string.pref_demand_status), flag_demand);
-                editor.apply();
             }
         });
     }
@@ -533,10 +534,11 @@ public class MainActivity extends AppCompatActivity {
     /**
      * update the UI accordingly of the user state and data (signed in or not, supplying/demanding or not).
      *  get the profile picture, set the buttons accordingly.
+     *  And stop firebase service and location service if user is signed out
      *
      * @param user The FirebaseUser variable that hold the current user metadata (can be null if not logged in)
      */
-    private void updateUI(FirebaseUser user){//todo initializeLogButton....
+    private void updateUI(FirebaseUser user){
         //if already signed in
         if(user!=null){
             //set the UI and initialize the Log Button
@@ -569,6 +571,13 @@ public class MainActivity extends AppCompatActivity {
                     imProfile.setImageBitmap(output);
                 }
             }).execute(photoUrl);
+
+            //initialize supply and demand button accordingly to the user state
+            initializeSupplyButton();
+            initializeDemandButton();
+
+            //Make sure the services are started
+            enableFirebaseAndLocationService();
         }
         //else not already signed in
         else{
@@ -584,11 +593,19 @@ public class MainActivity extends AppCompatActivity {
             imProfile.setVisibility(View.INVISIBLE);
             imageButtonSetting.setVisibility(View.INVISIBLE);
             btnLog.setVisibility(View.VISIBLE);
-        }
 
-        //initialize supply and demand button accordingly to the user state
-        initializeSupplyButton();
-        initializeDemandButton();
+            //initialize supply and demand button accordingly to the user state
+            flag_demand = false;
+            flag_supply = false;
+            initializeSupplyButton();
+            initializeDemandButton();
+
+            //If the user is logged out, then there is no need to keep tracking service on. So stop them
+            //Stop FirebaseService (and FirebaseService will stop LocationService in is onDestroy method)
+            Intent i_stop = new Intent(getApplicationContext(), FirebaseService.class);
+            Log.d(TAG, "stopService : updateUI with user == null");
+            stopService(i_stop);
+        }
     }
 
     /**
@@ -797,7 +814,6 @@ public class MainActivity extends AppCompatActivity {
                 phone_number = textPhoneNumber.getText().toString();
 
                 //getNetworkCountryIso
-                assert manager != null;
                 String CountryID= manager.getSimCountryIso().toUpperCase();
                 Phonenumber.PhoneNumber forCheckPhoneNumber = phoneUtil.getInvalidExampleNumber(CountryID);
                 try {
@@ -935,30 +951,51 @@ public class MainActivity extends AppCompatActivity {
     /**
      * add Supply to Firebase
      */
-    public boolean addSupplyToFirebase() {
+    public void addSupplyToFirebase() {
         Log.d(TAG, "addRideToFireBase" );
         if(location==null){
             Toast.makeText(getApplicationContext(), R.string.toast_no_location_fix,
                     Toast.LENGTH_SHORT).show();
-            return false;
+            return;
         }
         if(currentUser==null){
             Toast.makeText(getApplicationContext(), R.string.toast_not_logged_in,
                     Toast.LENGTH_SHORT).show();
-            return false;
+            return;
         }
 
         setSupplyDetails();
-
-        return true;
     }
 
 
-    //todo comments
+    //Call SupplyDetailsFragment, a "mini activity" that ask the users the details and make the Supply
+    //Than return to the callback methods onSupplyDialogPositiveClick or onSupplyDialogNegativeClick
     public void setSupplyDetails(){
         Log.d(TAG, "setSupplyDetails ");
         DialogFragment newSupplyFragment = SupplyDialogFragment.newInstance(facebookUserId,latitude,longitude);
         newSupplyFragment.show(getSupportFragmentManager(), "supplyDialogFragment");
+    }
+    @Override
+    public void onSupplyDialogPositiveClick(DialogFragment dialog) {
+        flag_supply = true;
+        btnSupply.setText(R.string.button_supply_cancel);
+
+        SharedPreferences.Editor editor = sharedPref.edit();
+        editor.putBoolean(getString(R.string.pref_supply_status), flag_supply);
+        editor.apply();
+
+        //disable the Demand button (cannot demand and supply in simultaneously)
+        btnDemand.setEnabled(false);
+    }
+
+    @Override
+    public void onSupplyDialogNegativeClick(DialogFragment dialog) {
+        flag_supply = false;
+        btnSupply.setText(R.string.button_supply);
+
+        SharedPreferences.Editor editor = sharedPref.edit();
+        editor.putBoolean(getString(R.string.pref_supply_status), flag_supply);
+        editor.apply();
     }
 
     /**
@@ -972,34 +1009,62 @@ public class MainActivity extends AppCompatActivity {
         }
         refSupply.child(facebookUserId).removeValue();
         geoFireSupply.removeLocation(facebookUserId);
+
+        //enable back the Demand button (cannot demand and supply in simultaneously)
+        btnDemand.setEnabled(true);
+
         return true;
     }
 
     /**
      * add Demand to Firebase
      */
-    public boolean addDemandToFireBase(){
+    public void addDemandToFireBase(){
         Log.d(TAG, "addDemandToFireBase" );
         if(location==null){
             Toast.makeText(getApplicationContext(), R.string.toast_no_location_fix,
                     Toast.LENGTH_SHORT).show();
-            return false;
+            return;
         }
         if(currentUser==null){
             Toast.makeText(getApplicationContext(), R.string.toast_not_logged_in,
                     Toast.LENGTH_SHORT).show();
-            return false;
+            return;
         }
 
         setDemandDetails();
-        return true;
     }
 
-    //todo comments
+    //Call DemandDetailsFragment, a "mini activity" that ask the users the details and make the Demand
+    //Than return to the callback methods onDemandDialogPositiveClick or onDemandDialogNegativeClick
     public void setDemandDetails(){
         Log.d(TAG, "setDemandDetails ");
         DialogFragment newDemandFragment = DemandDialogFragment.newInstance(facebookUserId,latitude,longitude);
         newDemandFragment.show(getSupportFragmentManager(), "supplyDialogFragment");
+    }
+    @Override
+    public void onDemandDialogPositiveClick(DialogFragment dialog) {
+        broadcastRequest(true);
+
+        flag_demand = true;
+        btnDemand.setText(R.string.button_demand_cancel);
+
+        SharedPreferences.Editor editor = sharedPref.edit();
+        editor.putBoolean(getString(R.string.pref_demand_status), flag_demand);
+        editor.apply();
+
+        //disable the Supply button (cannot demand and supply in simultaneously)
+        btnSupply.setEnabled(false);
+    }
+
+    @Override
+    public void onDemandDialogNegativeClick(DialogFragment dialog) {
+        flag_demand = false;
+        btnDemand.setText(R.string.button_demand);
+
+        SharedPreferences.Editor editor = sharedPref.edit();
+        editor.putBoolean(getString(R.string.pref_demand_status), flag_demand);
+        editor.apply();
     }
 
     /**
@@ -1014,6 +1079,10 @@ public class MainActivity extends AppCompatActivity {
         refDemand.child(facebookUserId).removeValue();
         geoFireDemand.removeLocation(facebookUserId);
         broadcastRequest(false);
+
+        //enable back the Supply button (cannot demand and supply in simultaneously)
+        btnSupply.setEnabled(true);
+
         return true;
     }
 

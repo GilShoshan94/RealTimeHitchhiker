@@ -13,7 +13,7 @@
         android:layout_marginEnd="8dp"
         android:layout_marginStart="8dp"
         android:text="@string/textview_result"
-        app:layout_constraintBottom_toTopOf="@+id/button_result"
+        app:layout_constraintBottom_toTopOf="@+id/button_call"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintHorizontal_bias="0.5"
         app:layout_constraintStart_toStartOf="parent"
@@ -33,13 +33,13 @@
         app:srcCompat="@drawable/com_facebook_profile_picture_blank_square" />
 
     <Button
-        android:id="@+id/button_result"
+        android:id="@+id/button_call"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginEnd="8dp"
         android:layout_marginStart="8dp"
-        android:onClick="quit"
-        android:text="@string/button_result"
+        android:onClick="callPhoneNumberSupply"
+        android:text="@string/button_result_call"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintHorizontal_bias="0.5"

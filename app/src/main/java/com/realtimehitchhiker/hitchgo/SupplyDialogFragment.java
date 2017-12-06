@@ -1,5 +1,6 @@
 package com.realtimehitchhiker.hitchgo;
 
+import android.app.Activity;
 import android.app.Dialog;
 import android.content.Context;
 import android.content.DialogInterface;
@@ -21,6 +22,8 @@ import com.firebase.geofire.GeoFire;
 import com.firebase.geofire.GeoLocation;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
+
+import java.util.Objects;
 
 /**
  * Created by gilshoshan on 04-Dec-17.
@@ -50,6 +53,8 @@ public class SupplyDialogFragment extends DialogFragment implements CounterHandl
     //todo String currency...
     String currency = "NIS";
 
+    // The activity that creates an instance of this dialog fragment must implement this interface
+    // It's to pass parameters
     public static SupplyDialogFragment newInstance(String facebookUserId, Double latitude, Double longitude) {
         
         Bundle args = new Bundle();
@@ -60,6 +65,32 @@ public class SupplyDialogFragment extends DialogFragment implements CounterHandl
         SupplyDialogFragment fragment = new SupplyDialogFragment();
         fragment.setArguments(args);
         return fragment;
+    }
+
+    /* The activity that creates an instance of this dialog fragment must
+     * implement this interface in order to receive event callbacks.
+     * Each method passes the DialogFragment in case the host needs to query it. */
+    public interface SupplyDialogListener {
+        void onSupplyDialogPositiveClick(DialogFragment dialog);
+        void onSupplyDialogNegativeClick(DialogFragment dialog);
+    }
+
+    // Use this instance of the interface to deliver action events
+    SupplyDialogListener mListener;
+
+    // Override the Fragment.onAttach() method to instantiate the NoticeDialogListener
+    @Override
+    public void onAttach(Context context) {
+        super.onAttach(context);
+        // Verify that the host activity implements the callback interface
+        try {
+            // Instantiate the NoticeDialogListener so we can send events to the host
+            mListener = (SupplyDialogListener) context;
+        } catch (ClassCastException e) {
+            // The activity doesn't implement the interface, throw exception
+            throw new ClassCastException(context.toString()
+                    + " must implement NoticeDialogListener");
+        }
     }
 
     @Override
@@ -104,6 +135,9 @@ public class SupplyDialogFragment extends DialogFragment implements CounterHandl
 
                         allow_pet_supply = checkBoxPetSupply.isChecked();
                         String destination = txtDestination.getText().toString();
+                        //todo destination validation...
+                        if(Objects.equals(destination, "") || Objects.equals(destination, " "))
+                            destination = "Forgot to tell...";
 
                         SharedPreferences.Editor editor = sharedPref.edit();
                         editor.putInt(getString(R.string.pref_supply_seats_in_car), seats_in_car);
@@ -115,6 +149,8 @@ public class SupplyDialogFragment extends DialogFragment implements CounterHandl
                         refSupply.child(facebookUserId).setValue(mySupply);
                         geoFireSupply.setLocation(facebookUserId, new GeoLocation(latitude, longitude));
 
+                        // Send the positive button event back to the host activity
+                        mListener.onSupplyDialogPositiveClick(SupplyDialogFragment.this);
                     }
                 })
                 .setNegativeButton(R.string.alert_dialog_cancel, new DialogInterface.OnClickListener() {
@@ -127,6 +163,9 @@ public class SupplyDialogFragment extends DialogFragment implements CounterHandl
                         editor.putInt(getString(R.string.pref_supply_fuel_price), fuel_price);
                         editor.putBoolean(getString(R.string.pref_supply_pet), allow_pet_supply);
                         editor.apply();
+
+                        // Send the negative button event back to the host activity
+                        mListener.onSupplyDialogNegativeClick(SupplyDialogFragment.this);
                     }
                 })
                 .setCancelable(false);
@@ -162,7 +201,7 @@ public class SupplyDialogFragment extends DialogFragment implements CounterHandl
                 .maxRange((long)max_fuel_price) // cant go any further than max_fuel_price
                 .startNumber((long)fuel_price)
                 .isCycle(false) // 49,50,-50,-49 and so on
-                .counterDelay(400) // speed of counter
+                .counterDelay(20) // speed of counter
                 .counterStep(1)  // steps e.g. 0,2,4,6...
                 .listener(this) // to listen counter results and show them in app
                 .build();
