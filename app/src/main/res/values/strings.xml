@@ -30,19 +30,21 @@
     <string name="pref_supply_fuel_price" translatable="false">supplyFuelPriceInt</string>
     <string name="pref_supply_pet" translatable="false">supplyPetBool</string>
     <string name="pref_demand_pet" translatable="false">demandPetBool</string>
+    <string name="pref_language" translatable="false">languageString</string>
+
 
     <!-- Notification -->
     <string name="channel_id" translatable="false">com.realtimehitchhiker.hitchgo.NOTIFICATION_CHANNEL_ID</string>
     <string name="channel_name" translatable="false">HitchGo notification</string>
     <string name="channel_description" translatable="false">HitchGo NOTIFICATION_CHANNEL</string>
-    <string name="notification_title">HitchGo found a tramp !</string>
+    <string name="notification_title">HitchGo found a ride !</string>
     <string name="notification_text">Click here to confirm</string>
 
     <!-- MAIN -->
-    <string name="button_findRide">Request a ride</string>
-    <string name="button_findRide_cancel">Cancel Request a ride</string>
-    <string name="button_giveRide">Supply a ride</string>
-    <string name="button_giveRide_cancel">Cancel supply</string>
+    <string name="button_demand">Request a ride</string>
+    <string name="button_demand_cancel">Cancel request</string>
+    <string name="button_supply">Supply a ride</string>
+    <string name="button_supply_cancel">Cancel supply</string>
     <string name="button_login">Login</string>
     <string name="button_logout">Logout</string>
     <string name="alert_dialog_ok">OK</string>
@@ -65,6 +67,11 @@
     <string name="toast_not_logged_in">You are not logged in\nLog in please</string>
     <string name="toast_no_location_fix">Enable location or wait for location fix</string>
     <string name="toast_invalid_phone_number">Invalid phone number</string>
+    <!-- Spinner language -->
+    <string-array name="languages" translatable="false">
+        <item>English</item>
+        <item>עיברית</item>
+    </string-array>
 
     <!-- DialogSettings -->
     <string name="button_plus" translatable="false">+</string>
@@ -87,8 +94,10 @@
 
     <!-- Result -->
     <string name="result">Drive confirmation</string>
-    <string name="button_result">Yay !</string>
+    <string name="button_result_call">Call driver</string>
     <string name="textview_result">Your driver is </string>
+    <string name="button_next" translatable="false">\u003E</string>
+    <string name="button_prev" translatable="false">\u003C</string>
 
     <!-- Example General settings (not in use)-->
     <string name="pref_header_general">General</string>

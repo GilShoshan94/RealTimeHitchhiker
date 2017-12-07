@@ -44,7 +44,7 @@
             android:checked="false"
             android:minHeight="0dp"
             android:minWidth="0dp"
-            android:text="@string/check_box_pet_supply"
+            android:text="@string/check_box_pet_demand"
             android:visibility="visible"
             app:layout_constraintEnd_toEndOf="@+id/textView_seats_demand"
             app:layout_constraintStart_toStartOf="@+id/textView_seats_demand"

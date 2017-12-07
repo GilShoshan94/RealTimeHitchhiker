@@ -1,9 +1,14 @@
 package com.realtimehitchhiker.hitchgo;
 
+import android.Manifest;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
+import android.net.Uri;
+import android.support.annotation.NonNull;
+import android.support.v4.app.ActivityCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
@@ -25,12 +30,15 @@ import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.database.Query;
 import com.google.firebase.database.ValueEventListener;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Objects;
+
+import io.michaelrocks.libphonenumber.android.PhoneNumberUtil;
 
 public class ResultActivity extends AppCompatActivity {
     public static final String TAG = "RESULT_DEBUG";
+    private static final int MY_PERMISSIONS_REQUEST_CALL_PHONE =1;
 
     //FireBase
     private FirebaseAuth mAuth;
@@ -43,12 +51,15 @@ public class ResultActivity extends AppCompatActivity {
     private GeoFire geoFireDemand;
     private MyGlobalHistory globalHistory;
 
-    private Button btnResultOk;
+    private Button btnCall;
+    private Button btnNext;
+    private Button btnPrev;
     private TextView txtShowDriver;
+    private TextView txtShowDriver2;
     private ImageView imProfile;
 
-    private String facebookUserIdFound, facebookUserId;
-    private Double latitude, longitude;
+    private String facebookUserId;
+    private String phoneFound = "tel:0377778888";//todo
     private String  requestingSeats="0", remainingSeats="0";
 
     private SharedPreferences sharedPref;
@@ -56,24 +67,37 @@ public class ResultActivity extends AppCompatActivity {
     private boolean flag_supply;
     private boolean flag_demand;
 
+    //RESULT
+    private ArrayList<String> resultKey = new ArrayList<>();
+    private ArrayList<ResultLocation> resultLocation = new ArrayList<>();
+    private Integer index = 0;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_result);
+
+        //Stop FirebaseService (and FirebaseService will stop LocationService in is onDestroy method)
+        //To not get new update
+        Intent i_stop = new Intent(getApplicationContext(), FirebaseService.class);
+        stopService(i_stop);
 
         sharedPref = this.getSharedPreferences(
                 getString(R.string.preference_file_key), Context.MODE_PRIVATE);
         flag_supply = sharedPref.getBoolean(getString(R.string.pref_supply_status), false);
         flag_demand = sharedPref.getBoolean(getString(R.string.pref_demand_status), false);
 
-        // Get the Intent that started this activity and extract the string
+        // Get the Intent that started this activity and extract the bundle
         Intent intent = getIntent();
-        facebookUserIdFound = (String) intent.getExtras().get("facebookUserIdFound");
-        latitude = (Double) intent.getExtras().get("geoLocationLatitude");
-        longitude = (Double) intent.getExtras().get("geoLocationLongitude");
+        Bundle bundle = intent.getExtras();
+        resultKey = bundle.getStringArrayList("facebookUserIdFound");
+        resultLocation = bundle.getParcelableArrayList("resultLocationFound");
 
-        btnResultOk = findViewById(R.id.button_result);
+        btnCall = findViewById(R.id.button_call);
+        btnNext = findViewById(R.id.button_result_next);
+        btnPrev = findViewById(R.id.button_result_prev);
         txtShowDriver = findViewById(R.id.textView_result);
+        txtShowDriver2 = findViewById(R.id.textView_result2);
         imProfile = findViewById(R.id.imageView_result);
 
         //For FireBase
@@ -89,8 +113,22 @@ public class ResultActivity extends AppCompatActivity {
         geoFireDemand = new GeoFire(myDataBaseRef.child("geofire/geofire-demand"));
         globalHistory = new MyGlobalHistory(refHistory);
 
+        //update the first Result
+        updateResult();
+    }
+
+    private void updateResult(){
+        if(index==(resultKey.size()-1)) //at the end of the list, there is no next after
+            btnNext.setEnabled(false);
+        else
+            btnNext.setEnabled(true);
+        if(index==0) //at the beginning of the list, there is no prev before
+            btnPrev.setEnabled(false);
+        else
+            btnPrev.setEnabled(true);
+
         //Set the picture
-        String photoUrl = "https://graph.facebook.com/" + facebookUserIdFound + "/picture?type=large";
+        String photoUrl = "https://graph.facebook.com/" + resultKey.get(index) + "/picture?type=large";
 
         new DownloadImageTask(new DownloadImageTask.AsyncResponse() {
             @Override
@@ -99,13 +137,75 @@ public class ResultActivity extends AppCompatActivity {
             }
         }).execute(photoUrl);
 
-        getNameFireBase(facebookUserIdFound);
+        getSupplyDetailsFireBase(resultKey.get(index));
+    }
 
-        updateFireBasDataBase();
+    /**
+     * Loads the next Supply found
+     *
+     * @param view the view it is linked to
+     */
+    public void nextSupply(View view){
+        index++;
+        updateResult();
+    }
 
-        //Stop FirebaseService (and FirebaseService will stop LocationService in is onDestroy method)
-        Intent i_stop = new Intent(getApplicationContext(), FirebaseService.class);
-        stopService(i_stop);
+    /**
+     * Loads the prev Supply found
+     *
+     * @param view the view it is linked to
+     */
+    public void prevSupply(View view){
+        index--;
+        updateResult();
+    }
+
+    /**
+     * This function get called when you press the phone number button
+     * it creates intent to call the number appears on the button and asks permission if needed
+     * @param view the view it is linked to (here the button to call)
+     */
+    public void callPhoneNumberSupply(View view) {
+        //String phoneNumber = view.getTag().toString();
+        Intent callIntent = new Intent(Intent.ACTION_CALL);
+        callIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_DOCUMENT);//todo explain
+        callIntent.setData(Uri.parse("tel:"+phoneFound));
+        if (ActivityCompat.checkSelfPermission(this,
+                Manifest.permission.CALL_PHONE) != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this,
+                    new String[]{Manifest.permission.CALL_PHONE},
+                    MY_PERMISSIONS_REQUEST_CALL_PHONE);
+
+        } else {
+            startActivity(callIntent);
+        }
+    }
+
+    //When the user responds to permission request, the system invokes your app's onRequestPermissionsResult() method.
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        switch (requestCode) {
+            case MY_PERMISSIONS_REQUEST_CALL_PHONE: {
+                // If request is cancelled, the result arrays are empty.
+                if (grantResults.length > 0
+                        && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                    callPhoneNumberSupply(btnCall);
+                    // permission was granted, yay!
+                } else {
+                    // permission denied, boo! Disable the
+                    // functionality that depends on this permission.
+                    //then just simply dial the number
+                    Intent dialIntent = new Intent(Intent.ACTION_DIAL);
+                    dialIntent.setData(Uri.parse("tel:"+phoneFound));
+                    dialIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_DOCUMENT);//todo explain
+                    startActivity(dialIntent);
+                }
+                return;
+            }
+            // other 'case' lines to check for other
+            // permissions this app might request
+        }
     }
 
     public void updateFireBasDataBase(){
@@ -150,7 +250,7 @@ public class ResultActivity extends AppCompatActivity {
     }
 
     public void updateFireBasDataBaseHelper(){
-        Query query = refSupply.orderByKey().equalTo(facebookUserIdFound);
+        Query query = refSupply.orderByKey().equalTo(resultKey.get(index));
         query.addListenerForSingleValueEvent(new ValueEventListener() {
             @Override
             public void onDataChange(DataSnapshot dataSnapshot) {
@@ -168,18 +268,18 @@ public class ResultActivity extends AppCompatActivity {
                         Log.d(TAG, "updateFireBasDataBaseHelper Supply TRY : "+remainingSeats);
                     }
                 }
-                refSupply.child(facebookUserIdFound).removeValue();
+                refSupply.child(resultKey.get(index)).removeValue();
                 addHistoryToFireBase();
             }
 
             @Override
             public void onCancelled(DatabaseError databaseError) {
                 Log.w(TAG, "DATABASE Failed to read value. in removeSupply", databaseError.toException());
-                refSupply.child(facebookUserIdFound).removeValue();
+                refSupply.child(resultKey.get(index)).removeValue();
                 addHistoryToFireBase();
             }
         });
-        geoFireSupply.removeLocation(facebookUserIdFound);
+        geoFireSupply.removeLocation(resultKey.get(index));
         flag_supply = false;
         SharedPreferences.Editor editor = sharedPref.edit();
         editor.putBoolean(getString(R.string.pref_supply_status), flag_supply);
@@ -189,19 +289,23 @@ public class ResultActivity extends AppCompatActivity {
     public void addHistoryToFireBase(){
         Log.d(TAG, "addHistoryToFireBase");
         Log.d(TAG, "Seats : " + remainingSeats + " and " + requestingSeats);
-        String supplyUserId = facebookUserIdFound;
+        String supplyUserId = resultKey.get(index);
         Map<String, String> demandUserId = new HashMap<>();
         String demandName = currentUser.getDisplayName();
         demandUserId.put(demandName, requestingSeats);
 
-        globalHistory.setGlobalHistory(refHistory.push().getKey(),
-                new GeoLocation(latitude, longitude), new GeoLocation(latitude, longitude),
+        globalHistory.setGlobalHistory(refHistory.push().getKey(),//todo...
+                new GeoLocation(resultLocation.get(index).latitude, resultLocation.get(index).longitude),
+                new GeoLocation(resultLocation.get(index).latitude, resultLocation.get(index).longitude),
                 supplyUserId, demandUserId, remainingSeats, requestingSeats);
     }
 
-    public void getNameFireBase(String fbUserId){
-        Query checkKeyQuery = refUsers.orderByKey().equalTo(fbUserId);
-        checkKeyQuery.addListenerForSingleValueEvent(new ValueEventListener() {
+    public void getSupplyDetailsFireBase(String fbUserId){
+
+        Query checkKeySupplyQuery = refSupply.orderByKey().equalTo(fbUserId);
+        Query checkKeyUserQuery = refUsers.orderByKey().equalTo(fbUserId);
+
+        checkKeyUserQuery.addListenerForSingleValueEvent(new ValueEventListener() {
             @Override
             public void onDataChange(DataSnapshot dataSnapshot) {
                 if (!dataSnapshot.exists()) {
@@ -210,15 +314,34 @@ public class ResultActivity extends AppCompatActivity {
                     //using for loop because FireBase returns JSON object that are always list.
                     for (DataSnapshot userSnapshot : dataSnapshot.getChildren()) {
                         MyUser user = userSnapshot.getValue(MyUser.class); //normally should be only one since unique KeyId
-                        getNameFireBaseHelper(user.name, user.email, user.phone);
+                        getNameFireBaseHelper(user.name, user.email, user.phone);//todo change name....
+                        phoneFound = user.phone;
                     }
                 }
             }
-
             @Override
             public void onCancelled(DatabaseError databaseError) {
                 Log.w(TAG, "DATABASE Failed to read value. in getNameFireBase", databaseError.toException());
                 getNameFireBaseHelper("Error", " ", " ");
+            }
+        });
+
+        checkKeySupplyQuery.addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override
+            public void onDataChange(DataSnapshot dataSnapshot) {
+                if (!dataSnapshot.exists()) {
+
+                } else {
+                    //using for loop because FireBase returns JSON object that are always list.
+                    for (DataSnapshot userSnapshot : dataSnapshot.getChildren()) {
+                        MySupply supply = userSnapshot.getValue(MySupply.class); //normally should be only one since unique KeyId
+                        getNameFireBaseHelper2(supply);//todo change name....
+                    }
+                }
+            }
+            @Override
+            public void onCancelled(DatabaseError databaseError) {
+                Log.w(TAG, "DATABASE Failed to read value. in getNameFireBase", databaseError.toException());
             }
         });
     }
@@ -227,8 +350,14 @@ public class ResultActivity extends AppCompatActivity {
         txtShowDriver.append(" "+name+"\nEmail : "+email+"\nPhone : "+phone);
     }
 
+    public void getNameFireBaseHelper2(MySupply supply){
+        txtShowDriver2.setText("Destination : " + supply.destination +
+                "\nFuel price : " + supply.fuelPrice + " " +supply.currency +
+                "\nPet allowed : " + supply.petAllowed + "\nRemaining seats : " + supply.remainingSeats);
+    }
+
     public void removeSupply(){
-        Query query = refSupply.orderByKey().equalTo(facebookUserIdFound);
+        Query query = refSupply.orderByKey().equalTo(resultKey.get(index));
         query.addListenerForSingleValueEvent(new ValueEventListener() {
             @Override
             public void onDataChange(DataSnapshot dataSnapshot) {
@@ -244,16 +373,16 @@ public class ResultActivity extends AppCompatActivity {
                         remainingSeats = "999"; //todo
                     }
                 }
-                refSupply.child(facebookUserIdFound).removeValue();
+                refSupply.child(resultKey.get(index)).removeValue();
             }
 
             @Override
             public void onCancelled(DatabaseError databaseError) {
                 Log.w(TAG, "DATABASE Failed to read value. in removeSupply", databaseError.toException());
-                refSupply.child(facebookUserIdFound).removeValue();
+                refSupply.child(resultKey.get(index)).removeValue();
             }
         });
-        geoFireSupply.removeLocation(facebookUserIdFound);
+        geoFireSupply.removeLocation(resultKey.get(index));
         flag_supply = false;
         SharedPreferences.Editor editor = sharedPref.edit();
         editor.putBoolean(getString(R.string.pref_supply_status), flag_supply);
@@ -300,8 +429,5 @@ public class ResultActivity extends AppCompatActivity {
         editor.apply();
     }
 
-    public void quit(View view){
-        finish();
-    }
 
 }

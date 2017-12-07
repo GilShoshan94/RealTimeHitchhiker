@@ -80,18 +80,17 @@ public class SettingsActivity extends AppCompatActivity {
             @Override
             public void onClick(View v) {
                 AuthUI.getInstance()
-                        .signOut(getApplication())
+                        .signOut(SettingsActivity.this)
                         .addOnCompleteListener(new OnCompleteListener<Void>() {
                             public void onComplete(@NonNull Task<Void> task) {
                                 // user is now signed out
-                                boolean flag_supply = false;
-                                boolean flag_demand = false;
                                 SharedPreferences.Editor editor = sharedPref.edit();
-                                editor.putBoolean(getString(R.string.pref_supply_status), flag_supply);
-                                editor.putBoolean(getString(R.string.pref_demand_status), flag_demand);
+                                editor.putBoolean(getString(R.string.pref_supply_status), false);
+                                editor.putBoolean(getString(R.string.pref_demand_status), false);
                                 editor.apply();
 
-                                updateUI(currentUser);
+                                // return to main activity
+                                finish();
                             }
                         });
             }
