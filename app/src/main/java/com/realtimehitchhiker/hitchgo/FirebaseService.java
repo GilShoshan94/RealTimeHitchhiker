@@ -11,15 +11,11 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.SharedPreferences;
-import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.location.Location;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.IBinder;
-import android.os.Parcel;
-import android.os.Parcelable;
-import android.support.v4.app.BundleCompat;
 import android.support.v4.app.NotificationCompat;
 import android.support.v4.app.TaskStackBuilder;
 import android.support.v4.content.LocalBroadcastManager;
@@ -31,12 +27,14 @@ import com.firebase.geofire.GeoQuery;
 import com.firebase.geofire.GeoQueryEventListener;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
+import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
+import com.google.firebase.database.Query;
+import com.google.firebase.database.ValueEventListener;
 
 import java.util.ArrayList;
-import java.util.List;
 
 
 /**
@@ -66,19 +64,30 @@ public class FirebaseService extends Service {
     private LocalBroadcastManager localBroadcastManager;
     private BroadcastReceiver broadcastReceiverLocUpdate, broadcastReceiverLocOff, broadcastReceiverRadiusUpdate;
     private BroadcastReceiver broadcastReceiverMainResume, broadcastReceiverMainPause, broadcastReceiverMainRequest;
-    private Double latitude = 90.0, longitude = 0.0;
+    private BroadcastReceiver broadcastReceiverDemandDetails;
+    private Double latitude = 90.0, longitude = 0.0; //initialize at pole North
     private SharedPreferences sharedPref;
     private int radius; // in meters
+
+    //Demand details //
+    private String demand_destination = "";
+    private boolean demand_pet;
+    private int demand_seats;
 
     //Flag
     private boolean main_activity_is_on = true;
     private boolean demand_true_or_cancel_false;
     private boolean on_process = false;
     private boolean initialization_flag = true;
+    private boolean result_sent_already = false;
 
     //RESULT
     private ArrayList<String> resultKey = new ArrayList<>();
     private ArrayList<ResultLocation> resultLocation = new ArrayList<>();
+
+    //Temporary Buffer
+    private ArrayList<String> resultKeyTempBuffer = new ArrayList<>();
+    private ArrayList<ResultLocation> resultLocationTempBuffer = new ArrayList<>();
 
     //public FirebaseService() {
     //}
@@ -132,12 +141,15 @@ public class FirebaseService extends Service {
         int defaultValue = getResources().getInteger(R.integer.pref_radius_min);
         radius = sharedPref.getInt(getString(R.string.pref_radius), defaultValue);
         demand_true_or_cancel_false = sharedPref.getBoolean(getString(R.string.pref_main_request_boolean), false);
+        demand_pet = sharedPref.getBoolean(getString(R.string.pref_demand_pet), false);
+        demand_seats = sharedPref.getInt(getString(R.string.pref_supply_seats_in_car), 1);
     }
 
     @Override
-    public int onStartCommand(Intent intent, int flags, int startId) {//todo add lat lng in intent to initialize
+    public int onStartCommand(Intent intent, int flags, int startId) {
         super.onStartCommand(intent, flags, startId);
         Log.d(TAG, "onStartCommand");
+
         if(broadcastReceiverLocUpdate == null){
             broadcastReceiverLocUpdate = new BroadcastReceiver() {
                 @SuppressLint("SetTextI18n")
@@ -162,7 +174,7 @@ public class FirebaseService extends Service {
             broadcastReceiverLocOff = new BroadcastReceiver() {
                 @Override
                 public void onReceive(Context context, Intent intent) {
-                    //todo for future improvements could fire a notification asking to enable location again
+                    //todo for future improvements could fire a notification asking to enable location again if not in app
                 }
             };
         }
@@ -212,6 +224,18 @@ public class FirebaseService extends Service {
                 }
             };
         }
+        if(broadcastReceiverDemandDetails == null){
+            broadcastReceiverDemandDetails = new BroadcastReceiver() {
+                @Override
+                public void onReceive(Context context, Intent intent) {
+                    Bundle bundle = intent.getExtras();
+
+                    demand_destination = bundle.getString("demand_destination");
+                    demand_pet = bundle.getBoolean("demand_pet");
+                    demand_seats = bundle.getInt("demand_seats");
+                }
+            };
+        }
 
         if(localBroadcastManager == null) {
             localBroadcastManager = LocalBroadcastManager.getInstance(this);
@@ -221,6 +245,7 @@ public class FirebaseService extends Service {
             localBroadcastManager.registerReceiver(broadcastReceiverMainResume, new IntentFilter(MainActivity.BROADCAST_ACTION_MAIN_RESUME));
             localBroadcastManager.registerReceiver(broadcastReceiverMainPause, new IntentFilter(MainActivity.BROADCAST_ACTION_MAIN_PAUSE));
             localBroadcastManager.registerReceiver(broadcastReceiverMainRequest, new IntentFilter(MainActivity.BROADCAST_ACTION_MAIN_REQUEST));
+            localBroadcastManager.registerReceiver(broadcastReceiverDemandDetails, new IntentFilter(DemandDialogFragment.BROADCAST_ACTION_DEMAND_DIALOG_FRAGMENT_REQUEST));
         }
 
         return START_STICKY;
@@ -263,12 +288,15 @@ public class FirebaseService extends Service {
         if(broadcastReceiverRadiusUpdate != null){
             localBroadcastManager.unregisterReceiver(broadcastReceiverRadiusUpdate);
         }
+        if(broadcastReceiverDemandDetails != null){
+            localBroadcastManager.unregisterReceiver(broadcastReceiverDemandDetails);
+        }
 
         Intent i_stop = new Intent(getApplicationContext(), LocationService.class);
         stopService(i_stop);
     }
 
-    private void buildAndFireNotification(ArrayList<String> facebookUserIdFound, ArrayList<ResultLocation> location) {
+    private void buildAndFireNotification() {
         Log.d(TAG, "buildAndFire_NOTIFICATION");
         notificationBuilder = new NotificationCompat.Builder(this, channel_id);
         notificationBuilder.setSmallIcon(R.mipmap.ic_launcher)
@@ -290,8 +318,8 @@ public class FirebaseService extends Service {
         Intent resultIntent = new Intent(this, ResultActivity.class);
 
         Bundle bundle = new Bundle();
-        bundle.putStringArrayList("facebookUserIdFound", resultKey);
-        bundle.putParcelableArrayList("resultLocationFound", resultLocation);
+        bundle.putStringArrayList("facebookUserIdFound", new ArrayList<>(resultKey));
+        bundle.putParcelableArrayList("resultLocationFound", new ArrayList<>(resultLocation));
 
         resultIntent.putExtras(bundle);
 
@@ -315,7 +343,6 @@ public class FirebaseService extends Service {
         // notification. For example, to cancel the notification, you can pass its ID
         // number to NotificationManager.cancel().
         mNotificationManager.notify(getResources().getInteger(R.integer.notification_id), notificationBuilder.build());
-
     }
 
     private void mainRequest() {
@@ -333,6 +360,9 @@ public class FirebaseService extends Service {
             on_process = false;
             resultKey.clear();
             resultLocation.clear();
+            resultKeyTempBuffer.clear();
+            resultLocationTempBuffer.clear();
+            result_sent_already = false;
         }
     }
 
@@ -345,19 +375,26 @@ public class FirebaseService extends Service {
             @Override
             public void onKeyEntered(String key, GeoLocation location) {
                 Log.d(TAG, "FIND : "+String.format("Key %s entered the search area at [%f,%f]", key, location.latitude, location.longitude));
-                if(resultKey.size() < getResources().getInteger(R.integer.pref_max_supply_found)) {
+                if(initialization_flag && resultKey.size() < getResources().getInteger(R.integer.pref_max_supply_found) ) {
                     resultKey.add(key);
                     resultLocation.add(new ResultLocation(location));
                 }
 
-                if(!on_process && resultKey.size() >= getResources().getInteger(R.integer.pref_max_supply_found)){
+                else if(initialization_flag && resultKey.size() >= getResources().getInteger(R.integer.pref_max_supply_found) && !on_process){
                     on_process = true;
                     initialization_flag = false;
                     processResult();
                 }
-                else if (!on_process && !initialization_flag){
+                else if (!initialization_flag && !on_process){
+                    resultKey.add(key);
+                    resultLocation.add(new ResultLocation(location));
                     on_process = true;
                     processResult();
+                }
+                else if (!initialization_flag && on_process && resultKeyTempBuffer.size() < getResources().getInteger(R.integer.pref_max_supply_found_buffer)){
+                    //add temporary buffer if on process with size limit for performance
+                    resultKeyTempBuffer.add(key);
+                    resultLocationTempBuffer.add(new ResultLocation(location));
                 }
             }
 
@@ -365,17 +402,42 @@ public class FirebaseService extends Service {
             public void onKeyExited(String key) {
                 Log.d(TAG, "FIND : "+String.format("Key %s is no longer in the search area", key));
                 int index = resultKey.indexOf(key);
-                resultKey.remove(index);
-                resultLocation.remove(index);
-                if(resultKey.isEmpty()){
-                    mNotificationManager.cancel(getResources().getInteger(R.integer.notification_id));
-                    on_process = false;
+                int indexBuffer = resultKeyTempBuffer.indexOf(key);
+
+                if(index !=-1) { //todo race with process() problem ??
+                    resultKey.remove(index);
+                    resultLocation.remove(index);
+                    if(!resultKeyTempBuffer.isEmpty()){
+                        resultKey.add(resultKeyTempBuffer.remove(0));
+                        resultLocation.add(resultLocationTempBuffer.remove(0));
+                        //todo update notification / result activity ?
+                    }
+                    if(resultKey.isEmpty()){//todo [A] fix the logic here since we delete the sent keys at [B]...
+                        mNotificationManager.cancel(getResources().getInteger(R.integer.notification_id));
+                        on_process = false;
+                    }
                 }
+
+                if(indexBuffer !=-1) {
+                    resultKeyTempBuffer.remove(index);
+                    resultLocationTempBuffer.remove(index);
+                }
+
             }
 
             @Override
             public void onKeyMoved(String key, GeoLocation location) {
                 Log.d(TAG, "FIND : "+String.format("Key %s moved within the search area to [%f,%f]", key, location.latitude, location.longitude));
+                int index = resultKey.indexOf(key);
+                int indexBuffer = resultKeyTempBuffer.indexOf(key);
+
+                if(index !=-1) {
+                    resultLocation.set(index, new ResultLocation(location));
+                    //todo update notification / result activity ?
+                }
+                if(indexBuffer !=-1) {
+                    resultLocationTempBuffer.set(indexBuffer, new ResultLocation(location));
+                }
             }
 
             @Override
@@ -402,33 +464,132 @@ public class FirebaseService extends Service {
     }
 
     private void processResult(){
-        //todo ... check data... remove if not enough seats...
-        if(main_activity_is_on){
-            Log.d(TAG, "processResult activity ON");
-
-            LocalBroadcastManager localBroadcastManager = LocalBroadcastManager.getInstance(this);
-            Intent intent = new Intent(BROADCAST_ACTION_SUPPLY_FOUND);
-
-            Bundle bundle = new Bundle();
-            bundle.putStringArrayList("facebookUserIdFound", new ArrayList<>(resultKey));
-            bundle.putParcelableArrayList("resultLocationFound", new ArrayList<>(resultLocation));//todo
-
-            intent.putExtras(bundle);
-            localBroadcastManager.sendBroadcast(intent);
-
-            if(geoQuery!=null) {
-                geoQuery.removeAllListeners();
+        // ... check data... remove if not enough seats...
+        ArrayList<String> oldKey = new ArrayList<>(resultKey); // to detect a change
+        for (int i=0; i<=getResources().getInteger(R.integer.pref_max_supply_found); i++) {
+            if(i == resultKey.size()){
+                while (!resultKeyTempBuffer.isEmpty() && resultKey.size()<getResources().getInteger(R.integer.pref_max_supply_found)){
+                    resultKey.add(resultKeyTempBuffer.remove(0));
+                    resultLocation.add(resultLocationTempBuffer.remove(0));
+                }
+                if(i == resultKey.size())
+                    break;
             }
-            geoQuery = null;
-            on_process = false;
-            //todo should I clear or not...
-            resultKey.clear();
-            resultLocation.clear();
+            if(resultKey.equals(oldKey)) {//todo make sure the equals() works as we wanted to
+                //if a change was made then we need to recheck the same i to not skip an element in the list
+                i--;
+                if(i<0)
+                    i=0;
+                oldKey.clear();
+                oldKey.addAll(resultKey);
+            }
+
+            Query checkKeySupplyQuery = refSupply.orderByKey().equalTo(resultKey.get(i));
+            checkKeySupplyQuery.addListenerForSingleValueEvent(new ValueEventListener() {
+                @Override
+                public void onDataChange(DataSnapshot dataSnapshot) {
+                    if (!dataSnapshot.exists()) {
+                        //not possible to arrive here...
+                    } else {
+                        //using for loop because FireBase returns JSON object that are always list.
+                        for (DataSnapshot userSnapshot : dataSnapshot.getChildren()) {
+                            MySupply supply = userSnapshot.getValue(MySupply.class); //normally should be only one since unique KeyId
+
+                            //check conditions:
+                            assert supply != null;
+                            if (demand_pet && !supply.petAllowed) { //if supply don't allow pet but demand has a pet
+                                int index = resultKey.indexOf(userSnapshot.getKey());
+                                resultKey.remove(index);
+                                resultLocation.remove(index);
+                                //then add from the buffer to keep feeding a minimum amount if possible
+                                if(!resultKeyTempBuffer.isEmpty()){
+                                    resultKey.add(resultKeyTempBuffer.remove(0));
+                                    resultLocation.add(resultLocationTempBuffer.remove(0));
+                                }
+                            }
+                            else if (demand_seats >  supply.remainingSeats) { ///if supply don't have enough remaining seats
+                                int index = resultKey.indexOf(userSnapshot.getKey());
+                                resultKey.remove(index);
+                                resultLocation.remove(index);
+                                //then add from the buffer to keep feeding a minimum amount if possible
+                                if(!resultKeyTempBuffer.isEmpty()){
+                                    resultKey.add(resultKeyTempBuffer.remove(0));
+                                    resultLocation.add(resultLocationTempBuffer.remove(0));
+                                }
+                            }
+                        }
+                    }
+                }
+                @Override
+                public void onCancelled(DatabaseError databaseError) {
+                    Log.w(TAG, "DATABASE Failed to read value. in getNameFireBase", databaseError.toException());
+                }
+            });
         }
-        else{
-            Log.d(TAG, "processResult activity OFF");
-            buildAndFireNotification(resultKey, resultLocation);
+
+
+        if(resultKey.isEmpty()){
+            on_process = false;
+            return;
+        }
+
+
+        if(!result_sent_already) {
+            if (main_activity_is_on) {
+                Log.d(TAG, "processResult main activity ON");
+
+                broadcastResult();
+            } else {
+                Log.d(TAG, "processResult main activity OFF");
+
+                buildAndFireNotification();
+            }
+
+            result_sent_already = true;
+
+            //clearing the lists we just sent to result to not sent it again
+            resultKey.clear(); //todo [b] fix the logic here to work with [A]...
+            resultLocation.clear();
+            on_process = false;
+        }
+        else {
+            // stay with the on_process flag set to true to freeze the resultKey/Location lists. (but the buffer are still loading)
         }
     }
 
+    private void broadcastResult(){
+        LocalBroadcastManager localBroadcastManager = LocalBroadcastManager.getInstance(this);
+        Intent intent = new Intent(BROADCAST_ACTION_SUPPLY_FOUND);
+
+        Bundle bundle = new Bundle();
+        bundle.putStringArrayList("facebookUserIdFound", new ArrayList<>(resultKey));
+        bundle.putParcelableArrayList("resultLocationFound", new ArrayList<>(resultLocation));
+
+        intent.putExtras(bundle);
+        localBroadcastManager.sendBroadcast(intent);
+    }
+
 }
+
+
+/*
+//the name of the method explains it well...
+    public boolean isTwoArrayListsWithSameValues(ArrayList<Object> list1, ArrayList<Object> list2)
+    {
+        //null checking
+        if(list1==null && list2==null)
+            return true;
+        if((list1 == null && list2 != null) || (list1 != null && list2 == null))
+            return false;
+
+        if(list1.size()!=list2.size())
+            return false;
+        for(Object itemList1: list1)
+        {
+            if(!list2.contains(itemList1))
+                return false;
+        }
+
+        return true;
+    }
+ */

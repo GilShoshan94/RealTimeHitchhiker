@@ -3,11 +3,13 @@ package com.realtimehitchhiker.hitchgo;
 import android.app.Dialog;
 import android.content.Context;
 import android.content.DialogInterface;
+import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.support.v4.app.DialogFragment;
+import android.support.v4.content.LocalBroadcastManager;
 import android.support.v7.app.AlertDialog;
 import android.util.Log;
 import android.view.LayoutInflater;
@@ -30,6 +32,7 @@ import java.util.Objects;
 
 public class DemandDialogFragment extends DialogFragment {
     public static final String TAG = "DEMAND_DIALOG_FRAGMENT";
+    public static final String BROADCAST_ACTION_DEMAND_DIALOG_FRAGMENT_REQUEST = "com.realtimehitchhiker.hitchgo.MAIN_DEMAND_DIALOG_FRAGMENT_REQUEST";
 
     private String facebookUserId = null;
     private Double latitude = null;
@@ -142,6 +145,9 @@ public class DemandDialogFragment extends DialogFragment {
                         refDemand.child(facebookUserId).setValue(myDemand);
                         geoFireDemand.setLocation(facebookUserId, new GeoLocation(latitude, longitude));
 
+                        // Send the demand details to FirebaseService
+                        broadcastDemandDetails();
+
                         // Send the positive button event back to the host activity
                         mListener.onDemandDialogPositiveClick(DemandDialogFragment.this);
                     }
@@ -200,5 +206,21 @@ public class DemandDialogFragment extends DialogFragment {
         });
 
         return builder.create();
+    }
+
+    /**
+     * broadcast Demand details for FirebaseService locally (internal to the app)
+     */
+    private void broadcastDemandDetails(){
+        LocalBroadcastManager localBroadcastManager = LocalBroadcastManager.getInstance(getActivity());
+        Intent intent = new Intent(BROADCAST_ACTION_DEMAND_DIALOG_FRAGMENT_REQUEST);
+
+        Bundle bundle = new Bundle();
+        bundle.putString("demand_destination", txtDestination.getText().toString());
+        bundle.putBoolean("demand_pet", demand_pet);
+        bundle.putInt("demand_seats", demand_seats);
+
+        intent.putExtras(bundle);
+        localBroadcastManager.sendBroadcast(intent);
     }
 }

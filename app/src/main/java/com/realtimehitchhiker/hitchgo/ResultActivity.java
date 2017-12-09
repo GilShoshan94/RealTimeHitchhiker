@@ -6,6 +6,8 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
+import android.graphics.drawable.BitmapDrawable;
+import android.graphics.drawable.Drawable;
 import android.net.Uri;
 import android.support.annotation.NonNull;
 import android.support.v4.app.ActivityCompat;
@@ -59,7 +61,7 @@ public class ResultActivity extends AppCompatActivity {
     private ImageView imProfile;
 
     private String facebookUserId;
-    private String phoneFound = "tel:0377778888";//todo
+    private String phoneFound = "tel:0000000000";
     private String  requestingSeats="0", remainingSeats="0";
 
     private SharedPreferences sharedPref;
@@ -133,7 +135,9 @@ public class ResultActivity extends AppCompatActivity {
         new DownloadImageTask(new DownloadImageTask.AsyncResponse() {
             @Override
             public void processFinish(Bitmap output) {
-                imProfile.setImageBitmap(output);
+                //imProfile.setImageBitmap(output);
+                Drawable drawable = new BitmapDrawable(getResources(), output);
+                imProfile.setBackground(drawable);
             }
         }).execute(photoUrl);
 

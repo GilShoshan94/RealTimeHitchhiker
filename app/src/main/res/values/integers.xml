@@ -4,13 +4,14 @@
     <integer name="pref_radius_min">1</integer>
     <integer name="pref_radius_max">10</integer>
     <integer name="pref_supply_max_seats_in_car">6</integer>
-    <integer name="pref_max_supply_found">10</integer>
     <integer name="pref_max_fuel_price">50</integer>
+    <integer name="pref_max_supply_found">10</integer>
+    <integer name="pref_max_supply_found_buffer">1000</integer>
 
     <!-- LocationServiceSettings -->
     <integer name="location_min_distance">1</integer> <!-- The minimum distance to change updates, in meters-->
     <integer name="location_min_time">30000</integer> <!-- The minimum time between updates from a provider, in milliseconds (30000 == 30 sec) -->
-    <integer name="location_max_time">120000</integer> <!-- The maximum time between updates for the location, in milliseconds (120000 == 2 minutes) -->
+    <integer name="location_max_time">60000</integer> <!-- The maximum time between updates for the location, in milliseconds (120000 == 2 minutes) -->
 
     <!-- Notification ID -->
     <integer name="notification_id">1</integer>
