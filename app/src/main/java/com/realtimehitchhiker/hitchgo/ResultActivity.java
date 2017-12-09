@@ -33,6 +33,7 @@ import com.google.firebase.database.Query;
 import com.google.firebase.database.ValueEventListener;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -92,8 +93,16 @@ public class ResultActivity extends AppCompatActivity {
         // Get the Intent that started this activity and extract the bundle
         Intent intent = getIntent();
         Bundle bundle = intent.getExtras();
-        resultKey = bundle.getStringArrayList("facebookUserIdFound");
-        resultLocation = bundle.getParcelableArrayList("resultLocationFound");
+        //bundle.setClassLoader(ResultLocation.class.getClassLoader());
+        assert bundle != null;
+        resultKey.addAll(bundle.getStringArrayList("facebookUserIdFound"));
+        //resultLocation.addAll(bundle.<ResultLocation>getParcelableArrayList("resultLocationFound"));
+        //todo
+        //resultKey.add(bundle.getString("facebookUserIdFound"));
+        resultLocation.add((ResultLocation) bundle.getParcelable("resultLocationFound"));
+        resultLocation.add((ResultLocation) bundle.getParcelable("resultLocationFound"));
+        //resultKey.add("10155826110714804");
+        //resultLocation.add(new ResultLocation(35.5, 32.2));
 
         btnCall = findViewById(R.id.button_call);
         btnNext = findViewById(R.id.button_result_next);

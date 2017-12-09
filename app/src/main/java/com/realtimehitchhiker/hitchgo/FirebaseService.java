@@ -47,6 +47,7 @@ import java.util.ArrayList;
 
 public class FirebaseService extends Service {
     public static final String BROADCAST_ACTION_SUPPLY_FOUND = "com.realtimehitchhiker.hitchgo.SUPPLY_FOUND";
+    public static final String BROADCAST_ACTION_SUPPLY_LOST = "com.realtimehitchhiker.hitchgo.SUPPLY_LOST";
     public static final String TAG = "FIREBASE_SERVICE_DEBUG";
 
     private NotificationManager mNotificationManager;
@@ -80,6 +81,9 @@ public class FirebaseService extends Service {
     private boolean on_process = false;
     private boolean initialization_flag = true;
     private boolean result_sent_already = false;
+    private boolean forLoopFinished = false;
+    private int queryFinished = 0;
+    private int querySent = 0;
 
     //RESULT
     private ArrayList<String> resultKey = new ArrayList<>();
@@ -88,6 +92,9 @@ public class FirebaseService extends Service {
     //Temporary Buffer
     private ArrayList<String> resultKeyTempBuffer = new ArrayList<>();
     private ArrayList<ResultLocation> resultLocationTempBuffer = new ArrayList<>();
+
+    //RESULT SENT
+    private ArrayList<String> resultKeySent = new ArrayList<>();
 
     //public FirebaseService() {
     //}
@@ -319,7 +326,6 @@ public class FirebaseService extends Service {
 
         Bundle bundle = new Bundle();
         bundle.putStringArrayList("facebookUserIdFound", new ArrayList<>(resultKey));
-        bundle.putParcelableArrayList("resultLocationFound", new ArrayList<>(resultLocation));
 
         resultIntent.putExtras(bundle);
 
@@ -349,6 +355,7 @@ public class FirebaseService extends Service {
         if (demand_true_or_cancel_false){
             Log.d(TAG, "mainRequest true");
             initialization_flag = true;
+            queryFinished = 0;
             findRideFromFireBase();
         }
         else {
@@ -358,11 +365,16 @@ public class FirebaseService extends Service {
             }
             geoQuery = null;
             on_process = false;
+            querySent = 0;
+            queryFinished = 0;
+            forLoopFinished = false;
             resultKey.clear();
             resultLocation.clear();
             resultKeyTempBuffer.clear();
             resultLocationTempBuffer.clear();
             result_sent_already = false;
+            resultKeySent.clear();
+            mNotificationManager.cancel(getResources().getInteger(R.integer.notification_id));
         }
     }
 
@@ -381,6 +393,8 @@ public class FirebaseService extends Service {
                 }
 
                 else if(initialization_flag && resultKey.size() >= getResources().getInteger(R.integer.pref_max_supply_found) && !on_process){
+                    resultKeyTempBuffer.add(key);
+                    resultLocationTempBuffer.add(new ResultLocation(location));
                     on_process = true;
                     initialization_flag = false;
                     processResult();
@@ -410,17 +424,28 @@ public class FirebaseService extends Service {
                     if(!resultKeyTempBuffer.isEmpty()){
                         resultKey.add(resultKeyTempBuffer.remove(0));
                         resultLocation.add(resultLocationTempBuffer.remove(0));
-                        //todo update notification / result activity ?
-                    }
-                    if(resultKey.isEmpty()){//todo [A] fix the logic here since we delete the sent keys at [B]...
-                        mNotificationManager.cancel(getResources().getInteger(R.integer.notification_id));
-                        on_process = false;
                     }
                 }
 
                 if(indexBuffer !=-1) {
                     resultKeyTempBuffer.remove(index);
                     resultLocationTempBuffer.remove(index);
+                }
+
+                int indexSent = resultKeySent.indexOf(key);
+                if (indexSent != 1) {
+                    broadcastResultLost(key); //update notification? / result activity
+                    resultKeySent.remove(index);
+                    if(resultKeySent.isEmpty()){
+                        if(!result_sent_already) {
+                            mNotificationManager.cancel(getResources().getInteger(R.integer.notification_id));
+                        }
+                    }
+                    //todo
+                    /*else {
+                        if ResultActivity is not on already, then update the notification...
+                    }
+                     */
                 }
 
             }
@@ -433,7 +458,6 @@ public class FirebaseService extends Service {
 
                 if(index !=-1) {
                     resultLocation.set(index, new ResultLocation(location));
-                    //todo update notification / result activity ?
                 }
                 if(indexBuffer !=-1) {
                     resultLocationTempBuffer.set(indexBuffer, new ResultLocation(location));
@@ -463,27 +487,31 @@ public class FirebaseService extends Service {
 
     }
 
-    private void processResult(){
+    private void processResult() {
         // ... check data... remove if not enough seats...
         ArrayList<String> oldKey = new ArrayList<>(resultKey); // to detect a change
-        for (int i=0; i<=getResources().getInteger(R.integer.pref_max_supply_found); i++) {
-            if(i == resultKey.size()){
-                while (!resultKeyTempBuffer.isEmpty() && resultKey.size()<getResources().getInteger(R.integer.pref_max_supply_found)){
+        querySent = 0;
+        forLoopFinished = false;
+
+        for (int i = 0; i <= getResources().getInteger(R.integer.pref_max_supply_found); i++) {
+            if (i == resultKey.size()) {
+                while (!resultKeyTempBuffer.isEmpty() && resultKey.size() < getResources().getInteger(R.integer.pref_max_supply_found)) {
                     resultKey.add(resultKeyTempBuffer.remove(0));
                     resultLocation.add(resultLocationTempBuffer.remove(0));
                 }
-                if(i == resultKey.size())
+                if (i == resultKey.size())
                     break;
             }
-            if(resultKey.equals(oldKey)) {//todo make sure the equals() works as we wanted to
+            if (!resultKey.equals(oldKey)) {//todo make sure the equals() works as we wanted to
                 //if a change was made then we need to recheck the same i to not skip an element in the list
                 i--;
-                if(i<0)
-                    i=0;
+                if (i < 0)
+                    i = 0;
                 oldKey.clear();
                 oldKey.addAll(resultKey);
             }
 
+            querySent++;
             Query checkKeySupplyQuery = refSupply.orderByKey().equalTo(resultKey.get(i));
             checkKeySupplyQuery.addListenerForSingleValueEvent(new ValueEventListener() {
                 @Override
@@ -493,33 +521,26 @@ public class FirebaseService extends Service {
                     } else {
                         //using for loop because FireBase returns JSON object that are always list.
                         for (DataSnapshot userSnapshot : dataSnapshot.getChildren()) {
-                            MySupply supply = userSnapshot.getValue(MySupply.class); //normally should be only one since unique KeyId
+                            //normally should be only once for this loop since unique KeyId
 
                             //check conditions:
-                            assert supply != null;
-                            if (demand_pet && !supply.petAllowed) { //if supply don't allow pet but demand has a pet
-                                int index = resultKey.indexOf(userSnapshot.getKey());
-                                resultKey.remove(index);
-                                resultLocation.remove(index);
-                                //then add from the buffer to keep feeding a minimum amount if possible
-                                if(!resultKeyTempBuffer.isEmpty()){
-                                    resultKey.add(resultKeyTempBuffer.remove(0));
-                                    resultLocation.add(resultLocationTempBuffer.remove(0));
-                                }
-                            }
-                            else if (demand_seats >  supply.remainingSeats) { ///if supply don't have enough remaining seats
-                                int index = resultKey.indexOf(userSnapshot.getKey());
-                                resultKey.remove(index);
-                                resultLocation.remove(index);
-                                //then add from the buffer to keep feeding a minimum amount if possible
-                                if(!resultKeyTempBuffer.isEmpty()){
-                                    resultKey.add(resultKeyTempBuffer.remove(0));
-                                    resultLocation.add(resultLocationTempBuffer.remove(0));
+                            checkConditions(userSnapshot);
+
+                            //add 1 to flag to indicate this query finished
+                            queryFinished++;
+
+                            Log.d(TAG, "ProcessResult in Query onDataChange : forLoopFinished = " + forLoopFinished);
+                            Log.d(TAG, "ProcessResult in Query onDataChange : querySent = " + querySent);
+                            Log.d(TAG, "ProcessResult in Query onDataChange : queryFinished = " + queryFinished);
+                            if (forLoopFinished) {
+                                if ((queryFinished == querySent)) {
+                                    postProcessResult();
                                 }
                             }
                         }
                     }
                 }
+
                 @Override
                 public void onCancelled(DatabaseError databaseError) {
                     Log.w(TAG, "DATABASE Failed to read value. in getNameFireBase", databaseError.toException());
@@ -527,12 +548,19 @@ public class FirebaseService extends Service {
             });
         }
 
+        forLoopFinished = true;
+    }
+
+    private void postProcessResult(){
+        Log.d(TAG, "postProcessResult : (queryFinished == querySent) ? " + (queryFinished == querySent));
 
         if(resultKey.isEmpty()){
             on_process = false;
+            querySent = 0;
+            queryFinished = 0;
+            forLoopFinished = false;
             return;
         }
-
 
         if(!result_sent_already) {
             if (main_activity_is_on) {
@@ -547,13 +575,17 @@ public class FirebaseService extends Service {
 
             result_sent_already = true;
 
+            //Add resultKey to resultKeySent to be able to remember what we sent
+            resultKeySent.addAll(resultKey);
+
             //clearing the lists we just sent to result to not sent it again
-            resultKey.clear(); //todo [b] fix the logic here to work with [A]...
+            resultKey.clear();
             resultLocation.clear();
             on_process = false;
         }
         else {
-            // stay with the on_process flag set to true to freeze the resultKey/Location lists. (but the buffer are still loading)
+            // todo update notification / result activity that there is more supply found
+            // For now stay with the on_process flag set to true to freeze the resultKey/Location lists. (but the buffer are still loading)
         }
     }
 
@@ -563,10 +595,42 @@ public class FirebaseService extends Service {
 
         Bundle bundle = new Bundle();
         bundle.putStringArrayList("facebookUserIdFound", new ArrayList<>(resultKey));
-        bundle.putParcelableArrayList("resultLocationFound", new ArrayList<>(resultLocation));
 
         intent.putExtras(bundle);
         localBroadcastManager.sendBroadcast(intent);
+    }
+
+    private void broadcastResultLost(String key){ //todo update notification? / result activity that we lost a supply
+        LocalBroadcastManager localBroadcastManager = LocalBroadcastManager.getInstance(this);
+        Intent intent = new Intent(BROADCAST_ACTION_SUPPLY_LOST);
+        intent.putExtra("facebookUserIdLost", key);
+        localBroadcastManager.sendBroadcast(intent);
+    }
+
+    private void checkConditions(DataSnapshot userSnapshot){
+        MySupply supply = userSnapshot.getValue(MySupply.class);
+
+        assert supply != null;
+        if (demand_pet && !supply.petAllowed) { //if supply don't allow pet but demand has a pet
+            int index = resultKey.indexOf(userSnapshot.getKey());
+            resultKey.remove(index);
+            resultLocation.remove(index);
+            //then add from the buffer to keep feeding a minimum amount if possible
+            if(!resultKeyTempBuffer.isEmpty()){
+                resultKey.add(resultKeyTempBuffer.remove(0));
+                resultLocation.add(resultLocationTempBuffer.remove(0));
+            }
+        }
+        else if (demand_seats >  supply.remainingSeats) { ///if supply don't have enough remaining seats
+            int index = resultKey.indexOf(userSnapshot.getKey());
+            resultKey.remove(index);
+            resultLocation.remove(index);
+            //then add from the buffer to keep feeding a minimum amount if possible
+            if(!resultKeyTempBuffer.isEmpty()){
+                resultKey.add(resultKeyTempBuffer.remove(0));
+                resultLocation.add(resultLocationTempBuffer.remove(0));
+            }
+        }
     }
 
 }

@@ -6,7 +6,7 @@
     <integer name="pref_supply_max_seats_in_car">6</integer>
     <integer name="pref_max_fuel_price">50</integer>
     <integer name="pref_max_supply_found">10</integer>
-    <integer name="pref_max_supply_found_buffer">1000</integer>
+    <integer name="pref_max_supply_found_buffer">100</integer>
 
     <!-- LocationServiceSettings -->
     <integer name="location_min_distance">1</integer> <!-- The minimum distance to change updates, in meters-->
