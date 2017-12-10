@@ -326,6 +326,8 @@ public class FirebaseService extends Service {
 
         Bundle bundle = new Bundle();
         bundle.putStringArrayList("facebookUserIdFound", new ArrayList<>(resultKey));
+        bundle.putDouble("latitude",latitude);
+        bundle.putDouble("longitude",longitude);
 
         resultIntent.putExtras(bundle);
 
@@ -595,6 +597,9 @@ public class FirebaseService extends Service {
 
         Bundle bundle = new Bundle();
         bundle.putStringArrayList("facebookUserIdFound", new ArrayList<>(resultKey));
+        bundle.putDouble("latitude",latitude);
+        bundle.putDouble("longitude",longitude);
+
 
         intent.putExtras(bundle);
         localBroadcastManager.sendBroadcast(intent);
