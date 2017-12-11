@@ -36,7 +36,7 @@ public class LocationService extends Service {
     private final static String passiveProvider = LocationManager.PASSIVE_PROVIDER;
     private final static String networkProvider = LocationManager.NETWORK_PROVIDER;
     private final static String gpsProvider = LocationManager.GPS_PROVIDER;
-    public final static String[] providerList = {passiveProvider, networkProvider, gpsProvider};
+    public final static String[] providerList = {passiveProvider, networkProvider, gpsProvider}; //todo .getAllProviders() ?
     public final static String[] activeProviderList = {networkProvider, gpsProvider};
     private static String lastActiveProvider = networkProvider;
     private MyLocationListener listener = new MyLocationListener();
@@ -49,23 +49,17 @@ public class LocationService extends Service {
     private int MAXIMUM_TIME;
 
     class MyLocationListener implements LocationListener{
-        Location listLoc;
 
         MyLocationListener()
         {
             Log.d(TAG, "LocationListener" );
-            listLoc = null;
         }
 
         @Override
         public void onLocationChanged(Location location) {
             if (isBetterLocation(location, myLastLocation)){
-                listLoc = location;
                 myLastLocation = location;
                 broadcastMyLocation();
-            }
-            else if (isBetterLocation(location, listLoc)){
-                listLoc = location;
             }
         }
 
@@ -138,6 +132,7 @@ public class LocationService extends Service {
     }
 
     private void broadcastMyLocation(){
+        Log.d(TAG, "BROADCAST MyLocation" );
         LocalBroadcastManager localBroadcastManager = LocalBroadcastManager.getInstance(this);
         Intent intent = new Intent(BROADCAST_ACTION_LOCATION_UPDATE);
         intent.putExtra("location", myLastLocation);
@@ -145,6 +140,7 @@ public class LocationService extends Service {
     }
 
     private void broadcastLocOff(){
+        Log.d(TAG, "BROADCAST Location OFF" );
         LocalBroadcastManager localBroadcastManager = LocalBroadcastManager.getInstance(this);
         Intent intentOff = new Intent(BROADCAST_ACTION_LOCATION_OFF);
         localBroadcastManager.sendBroadcast(intentOff);
@@ -248,10 +244,13 @@ public class LocationService extends Service {
         super.onStartCommand(i, flags, startId);
         Log.d(TAG, "onStartCommand" );
         Criteria criteria = new Criteria();
-        criteria.setAccuracy(Criteria.ACCURACY_FINE);
-        String provider = mLocationManager.getBestProvider(criteria, true);
-        if(provider != null)
-            myLastLocation = mLocationManager.getLastKnownLocation(provider);
+        criteria.setAccuracy(Criteria.NO_REQUIREMENT);
+        String provider = mLocationManager.getBestProvider(criteria, true);//todo
+        if(provider != null) {
+            if (isBetterLocation(mLocationManager.getLastKnownLocation(provider), myLastLocation)) {
+                myLastLocation = mLocationManager.getLastKnownLocation(provider);
+            }
+        }
         if(myLastLocation != null){
             Log.d(TAG, "onStart LastKnownLocation" );
             broadcastMyLocation();

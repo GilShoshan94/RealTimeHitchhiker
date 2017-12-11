@@ -1,6 +1,5 @@
 package com.realtimehitchhiker.hitchgo;
 
-import android.location.Location;
 import android.os.Parcel;
 import android.os.Parcelable;
 
@@ -12,21 +11,25 @@ import com.firebase.geofire.GeoLocation;
 
 public class ResultLocation implements Parcelable {
 
-    public Double latitude, longitude;
+    Double latitude, longitude;
 
     public ResultLocation() {
         // Default constructor required for Parcelable
     }
-    public ResultLocation(Double latitude, Double longitude) {
+    ResultLocation(Double latitude, Double longitude) {
         this.latitude = latitude;
         this.longitude = longitude;
     }
-    public ResultLocation(GeoLocation location) {
+    ResultLocation(GeoLocation location) {
+        this.latitude = location.latitude;
+        this.longitude = location.longitude;
+    }
+    ResultLocation(ResultLocation location) {
         this.latitude = location.latitude;
         this.longitude = location.longitude;
     }
 
-    protected ResultLocation(Parcel in) {
+    private ResultLocation(Parcel in) {
         if (in.readByte() == 0) {
             latitude = null;
         } else {

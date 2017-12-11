@@ -13,6 +13,8 @@ import android.content.pm.PackageManager;
 import android.content.res.Configuration;
 import android.content.res.Resources;
 import android.graphics.Bitmap;
+import android.graphics.drawable.BitmapDrawable;
+import android.graphics.drawable.Drawable;
 import android.location.Location;
 import android.location.LocationManager;
 import android.os.Build;
@@ -61,6 +63,7 @@ import com.google.firebase.database.ValueEventListener;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
@@ -253,6 +256,8 @@ public class MainActivity extends AppCompatActivity implements SupplyDialogFragm
                         longitude = location.getLongitude();
                         //todo deleted the txtShowLocation, it's here only for debug
                         txtShowLocation.setText("Lat :\t"+latitude+"\nLong :\t"+longitude+"\nProvider :\t"+location.getProvider());
+
+                        //todo update database if supplying or demanding
                     }
                 }
             };
@@ -273,15 +278,10 @@ public class MainActivity extends AppCompatActivity implements SupplyDialogFragm
                 @Override
                 public void onReceive(Context context, Intent intent) {
                     Log.d(TAG,"broadcastReceiverSupplyFound : onReceive " + intent.toString());
-                    ArrayList<String> resultKey;
-                    ArrayList<ResultLocation> resultLocation;
-
-                    Bundle bundle = intent.getExtras();
+                    Bundle bundle = new Bundle(intent.getExtras());
                     Log.d(TAG,"broadcastReceiverSupplyFound : onReceive " + bundle.toString());
-                    resultKey = bundle.getStringArrayList("facebookUserIdFound");
-                    resultLocation = bundle.getParcelableArrayList("resultLocationFound");
 
-                    callResultActivity(resultKey, resultLocation);
+                    callResultActivity(bundle);
                 }
             };
         }
@@ -600,7 +600,9 @@ public class MainActivity extends AppCompatActivity implements SupplyDialogFragm
             new DownloadImageTask(new DownloadImageTask.AsyncResponse() {
                 @Override
                 public void processFinish(Bitmap output) {
-                    imProfile.setImageBitmap(output);
+                    //imProfile.setImageBitmap(output);
+                    Drawable drawable = new BitmapDrawable(getResources(), output);
+                    imProfile.setBackground(drawable);
                 }
             }).execute(photoUrl);
 
@@ -763,14 +765,9 @@ public class MainActivity extends AppCompatActivity implements SupplyDialogFragm
     /**
      * start Result activity and send to it important data for result
      */
-    public void callResultActivity(ArrayList<String> resultKey, ArrayList<ResultLocation> resultLocation) {
-        Log.d(TAG, "MAIN_callResultActivity resultKey.isEmpty() = " + resultKey.isEmpty() );
-        Log.d(TAG, "MAIN_callResultActivity resultLocation.isEmpty() = " + resultLocation.isEmpty() );
+    public void callResultActivity(Bundle bundle) {
+        Log.d(TAG, "MAIN_callResultActivity bundle.toString() = " + bundle.toString() );
         Intent resultIntent = new Intent(this, ResultActivity.class);
-
-        Bundle bundle = new Bundle();
-        bundle.putStringArrayList("facebookUserIdFound", resultKey);
-        bundle.putParcelableArrayList("resultLocationFound", resultLocation);
 
         resultIntent.putExtras(bundle);
         startActivity(resultIntent);
@@ -1003,7 +1000,6 @@ public class MainActivity extends AppCompatActivity implements SupplyDialogFragm
 
         setSupplyDetails();
     }
-
 
     //Call SupplyDetailsFragment, a "mini activity" that ask the users the details and make the Supply
     //Than return to the callback methods onSupplyDialogPositiveClick or onSupplyDialogNegativeClick

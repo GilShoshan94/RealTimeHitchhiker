@@ -6,6 +6,8 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
+import android.graphics.drawable.BitmapDrawable;
+import android.graphics.drawable.Drawable;
 import android.net.Uri;
 import android.support.annotation.NonNull;
 import android.support.v4.app.ActivityCompat;
@@ -34,8 +36,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 
-import io.michaelrocks.libphonenumber.android.PhoneNumberUtil;
-
 public class ResultActivity extends AppCompatActivity {
     public static final String TAG = "RESULT_DEBUG";
     private static final int MY_PERMISSIONS_REQUEST_CALL_PHONE =1;
@@ -54,13 +54,15 @@ public class ResultActivity extends AppCompatActivity {
     private Button btnCall;
     private Button btnNext;
     private Button btnPrev;
-    private TextView txtShowDriver;
-    private TextView txtShowDriver2;
+    private Button btnBook;
+    private TextView txtShowSupplyProfile;
+    private TextView txtShowSupplyDetails;
     private ImageView imProfile;
 
     private String facebookUserId;
-    private String phoneFound = "tel:0377778888";//todo
+    private String phoneFound = "tel:0000000000";
     private String  requestingSeats="0", remainingSeats="0";
+    private Double myLatitude, myLongitude;
 
     private SharedPreferences sharedPref;
     //flag
@@ -69,18 +71,12 @@ public class ResultActivity extends AppCompatActivity {
 
     //RESULT
     private ArrayList<String> resultKey = new ArrayList<>();
-    private ArrayList<ResultLocation> resultLocation = new ArrayList<>();
     private Integer index = 0;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_result);
-
-        //Stop FirebaseService (and FirebaseService will stop LocationService in is onDestroy method)
-        //To not get new update
-        Intent i_stop = new Intent(getApplicationContext(), FirebaseService.class);
-        stopService(i_stop);
 
         sharedPref = this.getSharedPreferences(
                 getString(R.string.preference_file_key), Context.MODE_PRIVATE);
@@ -90,14 +86,18 @@ public class ResultActivity extends AppCompatActivity {
         // Get the Intent that started this activity and extract the bundle
         Intent intent = getIntent();
         Bundle bundle = intent.getExtras();
-        resultKey = bundle.getStringArrayList("facebookUserIdFound");
-        resultLocation = bundle.getParcelableArrayList("resultLocationFound");
+
+        assert bundle != null;
+        resultKey.addAll(bundle.getStringArrayList("facebookUserIdFound"));
+        myLatitude = bundle.getDouble("latitude");
+        myLongitude = bundle.getDouble("longitude");
 
         btnCall = findViewById(R.id.button_call);
         btnNext = findViewById(R.id.button_result_next);
         btnPrev = findViewById(R.id.button_result_prev);
-        txtShowDriver = findViewById(R.id.textView_result);
-        txtShowDriver2 = findViewById(R.id.textView_result2);
+        btnBook = findViewById(R.id.button_book);
+        txtShowSupplyProfile = findViewById(R.id.textView_resultSupplyProfile);
+        txtShowSupplyDetails = findViewById(R.id.textView_resultSupplyDetails);
         imProfile = findViewById(R.id.imageView_result);
 
         //For FireBase
@@ -133,11 +133,13 @@ public class ResultActivity extends AppCompatActivity {
         new DownloadImageTask(new DownloadImageTask.AsyncResponse() {
             @Override
             public void processFinish(Bitmap output) {
-                imProfile.setImageBitmap(output);
+                //imProfile.setImageBitmap(output);
+                Drawable drawable = new BitmapDrawable(getResources(), output);
+                imProfile.setBackground(drawable);
             }
         }).execute(photoUrl);
 
-        getSupplyDetailsFireBase(resultKey.get(index));
+        getSupplyInfoFireBase(resultKey.get(index));
     }
 
     /**
@@ -158,6 +160,79 @@ public class ResultActivity extends AppCompatActivity {
     public void prevSupply(View view){
         index--;
         updateResult();
+    }
+
+    public void getSupplyInfoFireBase(String fbUserId){
+
+        Query checkKeySupplyQuery = refSupply.orderByKey().equalTo(fbUserId);
+        Query checkKeyUserQuery = refUsers.orderByKey().equalTo(fbUserId);
+
+        checkKeyUserQuery.addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override
+            public void onDataChange(DataSnapshot dataSnapshot) {
+                if (!dataSnapshot.exists()) {
+                    setInfoSupplyProfileHelper("user not found in the database", " ");
+                } else {
+                    //using for loop because FireBase returns JSON object that are always list.
+                    for (DataSnapshot userSnapshot : dataSnapshot.getChildren()) {
+                        MyUser user = userSnapshot.getValue(MyUser.class); //normally should be only one since unique KeyId
+                        setInfoSupplyProfileHelper(user.name, user.phone);
+                        phoneFound = user.phone;
+                    }
+                }
+            }
+            @Override
+            public void onCancelled(DatabaseError databaseError) {
+                Log.w(TAG, "DATABASE Failed to read value. in getNameFireBase", databaseError.toException());
+                setInfoSupplyProfileHelper("Error", " ");
+            }
+        });
+
+        checkKeySupplyQuery.addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override
+            public void onDataChange(DataSnapshot dataSnapshot) {
+                if (!dataSnapshot.exists()) {
+
+                } else {
+                    //using for loop because FireBase returns JSON object that are always list.
+                    for (DataSnapshot userSnapshot : dataSnapshot.getChildren()) {
+                        MySupply supply = userSnapshot.getValue(MySupply.class); //normally should be only one since unique KeyId
+                        setInfoSupplyDetailsHelper(supply);
+                    }
+                }
+            }
+            @Override
+            public void onCancelled(DatabaseError databaseError) {
+                Log.w(TAG, "DATABASE Failed to read value. in getNameFireBase", databaseError.toException());
+            }
+        });
+    }
+
+    public void setInfoSupplyProfileHelper(String name, String phone){
+        String stringMessage = getString(R.string.txtProfile_name) +
+                name + "\n" +
+                getString(R.string.txtProfile_phone) +
+                phone;
+        txtShowSupplyProfile.setText(stringMessage);
+    }
+
+    public void setInfoSupplyDetailsHelper(MySupply supply){
+        StringBuilder stringBuilder = new StringBuilder();
+        stringBuilder.append(getString(R.string.txtDetails_dest))
+                .append(supply.destination).append("\n")
+                .append(getString(R.string.txtDetails_price))
+                .append(supply.fuelPrice).append(" ").append(supply.currency).append("\n")
+                .append(getString(R.string.txtDetails_petAllowed));
+        if(supply.petAllowed)
+            stringBuilder.append(getString(R.string.txtDetails_petAllowed_true));
+        else
+            stringBuilder.append(getString(R.string.txtDetails_petAllowed_false));
+
+        stringBuilder.append("\n")
+                .append(getString(R.string.txtDetails_remainingSeats))
+                .append(supply.remainingSeats);
+
+        txtShowSupplyDetails.setText(stringBuilder.toString());
     }
 
     /**
@@ -287,7 +362,7 @@ public class ResultActivity extends AppCompatActivity {
     }
 
     public void addHistoryToFireBase(){
-        Log.d(TAG, "addHistoryToFireBase");
+        /*Log.d(TAG, "addHistoryToFireBase");
         Log.d(TAG, "Seats : " + remainingSeats + " and " + requestingSeats);
         String supplyUserId = resultKey.get(index);
         Map<String, String> demandUserId = new HashMap<>();
@@ -297,63 +372,7 @@ public class ResultActivity extends AppCompatActivity {
         globalHistory.setGlobalHistory(refHistory.push().getKey(),//todo...
                 new GeoLocation(resultLocation.get(index).latitude, resultLocation.get(index).longitude),
                 new GeoLocation(resultLocation.get(index).latitude, resultLocation.get(index).longitude),
-                supplyUserId, demandUserId, remainingSeats, requestingSeats);
-    }
-
-    public void getSupplyDetailsFireBase(String fbUserId){
-
-        Query checkKeySupplyQuery = refSupply.orderByKey().equalTo(fbUserId);
-        Query checkKeyUserQuery = refUsers.orderByKey().equalTo(fbUserId);
-
-        checkKeyUserQuery.addListenerForSingleValueEvent(new ValueEventListener() {
-            @Override
-            public void onDataChange(DataSnapshot dataSnapshot) {
-                if (!dataSnapshot.exists()) {
-                    getNameFireBaseHelper("user not found in the database", " ", " ");
-                } else {
-                    //using for loop because FireBase returns JSON object that are always list.
-                    for (DataSnapshot userSnapshot : dataSnapshot.getChildren()) {
-                        MyUser user = userSnapshot.getValue(MyUser.class); //normally should be only one since unique KeyId
-                        getNameFireBaseHelper(user.name, user.email, user.phone);//todo change name....
-                        phoneFound = user.phone;
-                    }
-                }
-            }
-            @Override
-            public void onCancelled(DatabaseError databaseError) {
-                Log.w(TAG, "DATABASE Failed to read value. in getNameFireBase", databaseError.toException());
-                getNameFireBaseHelper("Error", " ", " ");
-            }
-        });
-
-        checkKeySupplyQuery.addListenerForSingleValueEvent(new ValueEventListener() {
-            @Override
-            public void onDataChange(DataSnapshot dataSnapshot) {
-                if (!dataSnapshot.exists()) {
-
-                } else {
-                    //using for loop because FireBase returns JSON object that are always list.
-                    for (DataSnapshot userSnapshot : dataSnapshot.getChildren()) {
-                        MySupply supply = userSnapshot.getValue(MySupply.class); //normally should be only one since unique KeyId
-                        getNameFireBaseHelper2(supply);//todo change name....
-                    }
-                }
-            }
-            @Override
-            public void onCancelled(DatabaseError databaseError) {
-                Log.w(TAG, "DATABASE Failed to read value. in getNameFireBase", databaseError.toException());
-            }
-        });
-    }
-
-    public void getNameFireBaseHelper(String name, String email, String phone){
-        txtShowDriver.append(" "+name+"\nEmail : "+email+"\nPhone : "+phone);
-    }
-
-    public void getNameFireBaseHelper2(MySupply supply){
-        txtShowDriver2.setText("Destination : " + supply.destination +
-                "\nFuel price : " + supply.fuelPrice + " " +supply.currency +
-                "\nPet allowed : " + supply.petAllowed + "\nRemaining seats : " + supply.remainingSeats);
+                supplyUserId, demandUserId, remainingSeats, requestingSeats);*/
     }
 
     public void removeSupply(){
@@ -429,5 +448,10 @@ public class ResultActivity extends AppCompatActivity {
         editor.apply();
     }
 
-
+    public void stopMyServices() {
+        //Stop FirebaseService (and FirebaseService will stop LocationService in is onDestroy method)
+        //To not get new update
+        Intent i_stop = new Intent(getApplicationContext(), FirebaseService.class);
+        stopService(i_stop);
+    }
 }
