@@ -29,9 +29,9 @@
         <!-- ACTIVITY -->
         <activity
             android:name=".MainActivity"
-            android:theme="@style/Base.Theme.AppCompat"
+            android:launchMode="singleTop"
             android:screenOrientation="portrait"
-            android:launchMode="singleTop" >
+            android:theme="@style/Base.Theme.AppCompat">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 
@@ -41,14 +41,14 @@
         <activity
             android:name=".SettingsActivity"
             android:label="@string/settings"
-            android:screenOrientation="portrait"
             android:parentActivityName=".MainActivity"
+            android:screenOrientation="portrait"
             android:theme="@style/Base.Theme.AppCompat" />
         <activity
-            android:name=".ResultActivity"
+            android:name=".ResultDemandActivity"
             android:label="@string/result"
-            android:screenOrientation="portrait"
             android:parentActivityName=".MainActivity"
+            android:screenOrientation="portrait"
             android:theme="@style/Base.Theme.AppCompat" />
         <activity
             android:name="com.facebook.FacebookActivity"
@@ -78,6 +78,7 @@
             android:exported="false" />
         <!-- RECEIVER -->
 
+        <activity android:name=".ResultSupplyActivity"></activity>
     </application>
 
 </manifest>

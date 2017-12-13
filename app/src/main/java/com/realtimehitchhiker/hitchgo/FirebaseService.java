@@ -48,6 +48,8 @@ import java.util.ArrayList;
 public class FirebaseService extends Service {
     public static final String BROADCAST_ACTION_SUPPLY_FOUND = "com.realtimehitchhiker.hitchgo.SUPPLY_FOUND";
     public static final String BROADCAST_ACTION_SUPPLY_LOST = "com.realtimehitchhiker.hitchgo.SUPPLY_LOST";
+    public static final String BROADCAST_ACTION_DEMAND_FOUND = "com.realtimehitchhiker.hitchgo.DEMAND_FOUND";
+    public static final String BROADCAST_ACTION_DEMAND_LOST = "com.realtimehitchhiker.hitchgo.DEMAND_LOST";
     public static final String TAG = "FIREBASE_SERVICE_DEBUG";
 
     private NotificationManager mNotificationManager;
@@ -322,7 +324,7 @@ public class FirebaseService extends Service {
             Supply a PendingIntent to send when the notification is cleared by the user directly from the notification panel. For example, this intent is sent when the user clicks the "Clear all" button, or the individual "X" buttons on notifications. This intent is not sent when the application calls NotificationManager.cancel(int).
             */
         // Creates an explicit intent for an Activity in your app
-        Intent resultIntent = new Intent(this, ResultActivity.class);
+        Intent resultIntent = new Intent(this, ResultDemandActivity.class);
 
         Bundle bundle = new Bundle();
         bundle.putStringArrayList("facebookUserIdFound", new ArrayList<>(resultKey));
@@ -337,7 +339,7 @@ public class FirebaseService extends Service {
         // your app to the Home screen.
         TaskStackBuilder stackBuilder = TaskStackBuilder.create(this);
         // Adds the back stack for the Intent (but not the Intent itself)
-        stackBuilder.addParentStack(ResultActivity.class);
+        stackBuilder.addParentStack(ResultDemandActivity.class);
         // Adds the Intent that starts the Activity to the top of the stack
         stackBuilder.addNextIntent(resultIntent);
         PendingIntent resultPendingIntent =
@@ -418,7 +420,6 @@ public class FirebaseService extends Service {
             public void onKeyExited(String key) {
                 Log.d(TAG, "FIND : "+String.format("Key %s is no longer in the search area", key));
                 int index = resultKey.indexOf(key);
-                int indexBuffer = resultKeyTempBuffer.indexOf(key);
 
                 if(index !=-1) { //todo race with process() problem ??
                     resultKey.remove(index);
@@ -429,15 +430,16 @@ public class FirebaseService extends Service {
                     }
                 }
 
+                int indexBuffer = resultKeyTempBuffer.indexOf(key);
                 if(indexBuffer !=-1) {
-                    resultKeyTempBuffer.remove(index);
-                    resultLocationTempBuffer.remove(index);
+                    resultKeyTempBuffer.remove(indexBuffer);
+                    resultLocationTempBuffer.remove(indexBuffer);
                 }
 
                 int indexSent = resultKeySent.indexOf(key);
-                if (indexSent != 1) {
+                if (indexSent !=-1) {
                     broadcastResultLost(key); //update notification? / result activity
-                    resultKeySent.remove(index);
+                    resultKeySent.remove(indexSent);
                     if(resultKeySent.isEmpty()){
                         if(!result_sent_already) {
                             mNotificationManager.cancel(getResources().getInteger(R.integer.notification_id));
@@ -445,7 +447,7 @@ public class FirebaseService extends Service {
                     }
                     //todo
                     /*else {
-                        if ResultActivity is not on already, then update the notification...
+                        if ResultDemandActivity is not on already, then update the notification...
                     }
                      */
                 }

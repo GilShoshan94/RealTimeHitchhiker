@@ -9,18 +9,18 @@ import android.graphics.Bitmap;
 import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
 import android.net.Uri;
+import android.os.Bundle;
 import android.support.annotation.NonNull;
 import android.support.v4.app.ActivityCompat;
 import android.support.v7.app.AppCompatActivity;
-import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import com.firebase.geofire.GeoFire;
-import com.firebase.geofire.GeoLocation;
 import com.google.firebase.auth.FacebookAuthProvider;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
@@ -29,14 +29,17 @@ import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
+import com.google.firebase.database.MutableData;
 import com.google.firebase.database.Query;
+import com.google.firebase.database.Transaction;
 import com.google.firebase.database.ValueEventListener;
 
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 
-public class ResultActivity extends AppCompatActivity {
+public class ResultDemandActivity extends AppCompatActivity {
     public static final String TAG = "RESULT_DEBUG";
     private static final int MY_PERMISSIONS_REQUEST_CALL_PHONE =1;
 
@@ -61,13 +64,14 @@ public class ResultActivity extends AppCompatActivity {
 
     private String facebookUserId;
     private String phoneFound = "tel:0000000000";
-    private String  requestingSeats="0", remainingSeats="0";
+    private int  demand_seats;
     private Double myLatitude, myLongitude;
 
     private SharedPreferences sharedPref;
     //flag
     private boolean flag_supply;
     private boolean flag_demand;
+    private boolean flag_book;
 
     //RESULT
     private ArrayList<String> resultKey = new ArrayList<>();
@@ -76,21 +80,38 @@ public class ResultActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_result);
+        setContentView(R.layout.activity_result_demand);
 
         sharedPref = this.getSharedPreferences(
                 getString(R.string.preference_file_key), Context.MODE_PRIVATE);
         flag_supply = sharedPref.getBoolean(getString(R.string.pref_supply_status), false);
         flag_demand = sharedPref.getBoolean(getString(R.string.pref_demand_status), false);
+        demand_seats = sharedPref.getInt(getString(R.string.pref_demand_seats_in_car), 1);
+        flag_book = sharedPref.getBoolean(getString(R.string.pref_demand_book_satus), false);
+
+        Set<String> setResultKey = sharedPref.getStringSet(getString(R.string.pref_resultKey_forDemand), null);
+        if(setResultKey != null) {
+            resultKey.addAll(setResultKey);
+        }
+
 
         // Get the Intent that started this activity and extract the bundle
         Intent intent = getIntent();
         Bundle bundle = intent.getExtras();
 
-        assert bundle != null;
-        resultKey.addAll(bundle.getStringArrayList("facebookUserIdFound"));
-        myLatitude = bundle.getDouble("latitude");
-        myLongitude = bundle.getDouble("longitude");
+        if (bundle != null) {
+            if (bundle.getStringArrayList("facebookUserIdFound") != null) {
+                resultKey.addAll(bundle.getStringArrayList("facebookUserIdFound"));
+
+                Set<String> set = new HashSet<>();
+                set.addAll(resultKey);
+                SharedPreferences.Editor edit=sharedPref.edit();
+                edit.putStringSet(getString(R.string.pref_resultKey_forDemand), set);
+                edit.apply();
+            }
+            myLatitude = bundle.getDouble("latitude");
+            myLongitude = bundle.getDouble("longitude");
+        }
 
         btnCall = findViewById(R.id.button_call);
         btnNext = findViewById(R.id.button_result_next);
@@ -113,19 +134,36 @@ public class ResultActivity extends AppCompatActivity {
         geoFireDemand = new GeoFire(myDataBaseRef.child("geofire/geofire-demand"));
         globalHistory = new MyGlobalHistory(refHistory);
 
-        //update the first Result
-        updateResult();
+        for(UserInfo profile : currentUser.getProviderData()) {
+            // check if the provider id matches "facebook.com"
+            if(FacebookAuthProvider.PROVIDER_ID.equals(profile.getProviderId())) {
+                facebookUserId = profile.getUid();
+            }
+        }
+
+        //update the first Result UI
+        updateResultUI();
     }
 
-    private void updateResult(){
-        if(index==(resultKey.size()-1)) //at the end of the list, there is no next after
+    private void updateResultUI(){
+        //If we booked already than, we can just see our supply and we cannot rebook
+        if(flag_book){
+            btnBook.setEnabled(false);
             btnNext.setEnabled(false);
-        else
-            btnNext.setEnabled(true);
-        if(index==0) //at the beginning of the list, there is no prev before
             btnPrev.setEnabled(false);
-        else
-            btnPrev.setEnabled(true);
+        }
+        else {
+            btnBook.setEnabled(true);
+
+            if (index == (resultKey.size() - 1)) //at the end of the list, there is no next after
+                btnNext.setEnabled(false);
+            else
+                btnNext.setEnabled(true);
+            if (index == 0) //at the beginning of the list, there is no prev before
+                btnPrev.setEnabled(false);
+            else
+                btnPrev.setEnabled(true);
+        }
 
         //Set the picture
         String photoUrl = "https://graph.facebook.com/" + resultKey.get(index) + "/picture?type=large";
@@ -149,7 +187,7 @@ public class ResultActivity extends AppCompatActivity {
      */
     public void nextSupply(View view){
         index++;
-        updateResult();
+        updateResultUI();
     }
 
     /**
@@ -159,7 +197,7 @@ public class ResultActivity extends AppCompatActivity {
      */
     public void prevSupply(View view){
         index--;
-        updateResult();
+        updateResultUI();
     }
 
     public void getSupplyInfoFireBase(String fbUserId){
@@ -174,8 +212,8 @@ public class ResultActivity extends AppCompatActivity {
                     setInfoSupplyProfileHelper("user not found in the database", " ");
                 } else {
                     //using for loop because FireBase returns JSON object that are always list.
-                    for (DataSnapshot userSnapshot : dataSnapshot.getChildren()) {
-                        MyUser user = userSnapshot.getValue(MyUser.class); //normally should be only one since unique KeyId
+                    for (DataSnapshot supplySnapshot : dataSnapshot.getChildren()) {
+                        MyUser user = supplySnapshot.getValue(MyUser.class); //normally should be only one since unique KeyId
                         setInfoSupplyProfileHelper(user.name, user.phone);
                         phoneFound = user.phone;
                     }
@@ -192,7 +230,7 @@ public class ResultActivity extends AppCompatActivity {
             @Override
             public void onDataChange(DataSnapshot dataSnapshot) {
                 if (!dataSnapshot.exists()) {
-
+                    txtShowSupplyDetails.setText(" ");
                 } else {
                     //using for loop because FireBase returns JSON object that are always list.
                     for (DataSnapshot userSnapshot : dataSnapshot.getChildren()) {
@@ -204,6 +242,7 @@ public class ResultActivity extends AppCompatActivity {
             @Override
             public void onCancelled(DatabaseError databaseError) {
                 Log.w(TAG, "DATABASE Failed to read value. in getNameFireBase", databaseError.toException());
+                txtShowSupplyDetails.setText(" ");
             }
         });
     }
@@ -283,125 +322,81 @@ public class ResultActivity extends AppCompatActivity {
         }
     }
 
-    public void updateFireBasDataBase(){
-        facebookUserId = "";
-        for(UserInfo profile : currentUser.getProviderData()) {
-            // check if the provider id matches "facebook.com"
-            if(FacebookAuthProvider.PROVIDER_ID.equals(profile.getProviderId())) {
-                facebookUserId = profile.getUid();
-            }
-        }
-        Query checkKeyQuery = refDemand.orderByKey().equalTo(facebookUserId);
-        checkKeyQuery.addListenerForSingleValueEvent(new ValueEventListener() {
-
-            @Override
-            public void onDataChange(DataSnapshot dataSnapshot) {
-                if (!dataSnapshot.exists()) {
-                    requestingSeats = "-1";
-                    Log.w(TAG, "DATABASE Failed to read value. in removeDemand");
-                } else {
-                    //using for loop because FireBase returns JSON object that are always list.
-                    for (DataSnapshot userSnapshot : dataSnapshot.getChildren()) {
-                        MyDemand user = userSnapshot.getValue(MyDemand.class); //normally should be only one since unique KeyId
-                        //todo requestingSeats = (user.requestingSeats);
-                    }
-                }
-                refDemand.child(facebookUserId).removeValue();
-                updateFireBasDataBaseHelper();
-            }
-
-            @Override
-            public void onCancelled(DatabaseError databaseError) {
-                Log.w(TAG, "DATABASE Failed to read value. in removeDemand", databaseError.toException());
-                refDemand.child(facebookUserId).removeValue();
-                updateFireBasDataBaseHelper();
-            }
-        });
-        geoFireDemand.removeLocation(facebookUserId);
-        flag_demand = false;
-        SharedPreferences.Editor editor = sharedPref.edit();
-        editor.putBoolean(getString(R.string.pref_demand_status), flag_demand);
-        editor.apply();
+    /**
+     * This function get called when you press the book button
+     * it start a transaction that try to book the supply
+     * @param view the view it is linked to (here the button to book)
+     */
+    public void bookSupply(View view){
+        transactionBookSupply();
     }
 
-    public void updateFireBasDataBaseHelper(){
-        Query query = refSupply.orderByKey().equalTo(resultKey.get(index));
-        query.addListenerForSingleValueEvent(new ValueEventListener() {
+    public void transactionBookSupply() {
+        refSupply.child(resultKey.get(index)).runTransaction(new Transaction.Handler() {
             @Override
-            public void onDataChange(DataSnapshot dataSnapshot) {
-                if (!dataSnapshot.exists()) {
-                    remainingSeats = "-1";
-                    Log.w(TAG, "DATABASE Failed to read value. in removeSupply");
-                } else {
-                    //using for loop because FireBase returns JSON object that are always list.
-                    for (DataSnapshot userSnapshot : dataSnapshot.getChildren()) {
-                        Log.d(TAG, "updateFireBasDataBaseHelper Supply : " + userSnapshot.toString());
-                        //TODO WTF it doesn't work normaly ???
-                        //MySupply user = userSnapshot.getValue(MySupply.class); //normally should be only one since unique KeyId
-                        //remainingSeats = (user.remainingSeats);
-                        remainingSeats = userSnapshot.child("remainingSeats").getValue().toString();
-                        Log.d(TAG, "updateFireBasDataBaseHelper Supply TRY : "+remainingSeats);
-                    }
+            public Transaction.Result doTransaction(MutableData mutableData) {
+                MySupply supply = mutableData.getValue(MySupply.class);
+                if (supply == null) {
+                    Log.d(TAG, "do Transaction : supply == null");
+                    //Note: Because doTransaction() is called multiple times, it must be able to handle null data. Even if there is existing data in your remote database, it may not be locally cached when the transaction function is run, resulting in null for the initial value.
+                    // Or too late, ALL the seats are gone already and the supply was already removed.
+                    return Transaction.success(mutableData);
                 }
-                refSupply.child(resultKey.get(index)).removeValue();
-                addHistoryToFireBase();
+
+                Log.d(TAG, "do Transaction : supply != null");
+                if (supply.remainingSeats >= demand_seats) {
+                    // There is still enough seats, then book
+                    supply.remainingSeats = supply.remainingSeats - demand_seats;
+                } else {
+                    // To late, the seats are gone already.
+                    return Transaction.abort();
+                }
+
+                // Set value and report transaction success
+                mutableData.setValue(supply);
+                return Transaction.success(mutableData);
             }
 
             @Override
-            public void onCancelled(DatabaseError databaseError) {
-                Log.w(TAG, "DATABASE Failed to read value. in removeSupply", databaseError.toException());
-                refSupply.child(resultKey.get(index)).removeValue();
-                addHistoryToFireBase();
+            public void onComplete(DatabaseError databaseError, boolean committed,
+                                   DataSnapshot currentData) {
+                // Transaction completed
+                if (databaseError != null) {
+                    Log.d(TAG, "post Transaction:onComplete databaseError:" + databaseError);
+                    Toast.makeText(getApplicationContext(), databaseError.getMessage(),
+                            Toast.LENGTH_SHORT).show();
+                }
+                if(committed){
+                    Log.d(TAG, "post Transaction:onComplete:" + currentData);
+                    if (!currentData.exists()) {
+                        Log.d(TAG, "post Transaction:onComplete: !currentData.exists()");
+                        // To late, all the seats are gone already. And the supply got already removed
+                        Toast.makeText(getApplicationContext(), getString(R.string.toast_all_seats_gone_or_supply_canceled),
+                                Toast.LENGTH_SHORT).show();
+                    } else {
+                        finishDemanding();
+                        MySupply supply = currentData.getValue(MySupply.class);
+                        if (supply.remainingSeats == 0) {
+                            Log.d(TAG, "post Transaction:onComplete: remainingSeats == 0");
+                            // We just booked the last seat(s), so remove supply
+                            removeSupply();
+                        }
+                    }
+                }
+                else {
+                    Log.d(TAG, "post Transaction:onComplete: not committed");
+                    // To late, the seats are gone already. The Transaction was abort
+                    Toast.makeText(getApplicationContext(), getString(R.string.toast_all_seats_gone),
+                            Toast.LENGTH_SHORT).show();
+                }
             }
         });
+    }
+
+    public void removeSupply(){//todo
+        refSupply.child(resultKey.get(index)).removeValue();
         geoFireSupply.removeLocation(resultKey.get(index));
-        flag_supply = false;
-        SharedPreferences.Editor editor = sharedPref.edit();
-        editor.putBoolean(getString(R.string.pref_supply_status), flag_supply);
-        editor.apply();
-    }
 
-    public void addHistoryToFireBase(){
-        /*Log.d(TAG, "addHistoryToFireBase");
-        Log.d(TAG, "Seats : " + remainingSeats + " and " + requestingSeats);
-        String supplyUserId = resultKey.get(index);
-        Map<String, String> demandUserId = new HashMap<>();
-        String demandName = currentUser.getDisplayName();
-        demandUserId.put(demandName, requestingSeats);
-
-        globalHistory.setGlobalHistory(refHistory.push().getKey(),//todo...
-                new GeoLocation(resultLocation.get(index).latitude, resultLocation.get(index).longitude),
-                new GeoLocation(resultLocation.get(index).latitude, resultLocation.get(index).longitude),
-                supplyUserId, demandUserId, remainingSeats, requestingSeats);*/
-    }
-
-    public void removeSupply(){
-        Query query = refSupply.orderByKey().equalTo(resultKey.get(index));
-        query.addListenerForSingleValueEvent(new ValueEventListener() {
-            @Override
-            public void onDataChange(DataSnapshot dataSnapshot) {
-                Log.d(TAG, "removeSupply dataSnapshot " + dataSnapshot.toString());
-                if (!dataSnapshot.exists()) {
-                    remainingSeats = "-1";
-                    Log.w(TAG, "DATABASE Failed to read value. in removeSupply");
-                } else {
-                    //using for loop because FireBase returns JSON object that are always list.
-                    for (DataSnapshot userSnapshot : dataSnapshot.getChildren()) {
-                        MySupply user = userSnapshot.getValue(MySupply.class); //normally should be only one since unique KeyId
-                        //remainingSeats = (user.remainingSeats);
-                        remainingSeats = "999"; //todo
-                    }
-                }
-                refSupply.child(resultKey.get(index)).removeValue();
-            }
-
-            @Override
-            public void onCancelled(DatabaseError databaseError) {
-                Log.w(TAG, "DATABASE Failed to read value. in removeSupply", databaseError.toException());
-                refSupply.child(resultKey.get(index)).removeValue();
-            }
-        });
-        geoFireSupply.removeLocation(resultKey.get(index));
         flag_supply = false;
         SharedPreferences.Editor editor = sharedPref.edit();
         editor.putBoolean(getString(R.string.pref_supply_status), flag_supply);
@@ -409,49 +404,57 @@ public class ResultActivity extends AppCompatActivity {
     }
 
     public void removeDemand(){
-        facebookUserId = "";
-        for(UserInfo profile : currentUser.getProviderData()) {
-            // check if the provider id matches "facebook.com"
-            if(FacebookAuthProvider.PROVIDER_ID.equals(profile.getProviderId())) {
-                facebookUserId = profile.getUid();
-            }
-        }
-        Log.d(TAG, "removeDemand : facebookUserId : " + facebookUserId);
-        Query checkKeyQuery = refDemand.orderByKey().equalTo(facebookUserId);
-        checkKeyQuery.addListenerForSingleValueEvent(new ValueEventListener() {
-
-            @Override
-            public void onDataChange(DataSnapshot dataSnapshot) {
-                if (!dataSnapshot.exists()) {
-                    requestingSeats = "-1";
-                    Log.w(TAG, "DATABASE Failed to read value. in removeDemand");
-                } else {
-                    //using for loop because FireBase returns JSON object that are always list.
-                    for (DataSnapshot userSnapshot : dataSnapshot.getChildren()) {
-                        MyDemand user = userSnapshot.getValue(MyDemand.class); //normally should be only one since unique KeyId
-                        //todo requestingSeats = (user.requestingSeats);
-                    }
-                }
-                refDemand.child(facebookUserId).removeValue();
-            }
-
-            @Override
-            public void onCancelled(DatabaseError databaseError) {
-                Log.w(TAG, "DATABASE Failed to read value. in removeDemand", databaseError.toException());
-                refDemand.child(facebookUserId).removeValue();
-            }
-        });
+        refDemand.child(facebookUserId).removeValue();
         geoFireDemand.removeLocation(facebookUserId);
-        flag_demand = false;
-        SharedPreferences.Editor editor = sharedPref.edit();
-        editor.putBoolean(getString(R.string.pref_demand_status), flag_demand);
-        editor.apply();
     }
 
+    /**
+     * stopMyServices() terminated the services FirebaseService and LocationService
+     */
     public void stopMyServices() {
         //Stop FirebaseService (and FirebaseService will stop LocationService in is onDestroy method)
         //To not get new update
         Intent i_stop = new Intent(getApplicationContext(), FirebaseService.class);
         stopService(i_stop);
+    }
+
+    /**
+     * finishDemanding stop the services, remove the demand, write into the history
+     *  And set the flag_book=true and flag_demand=false and save them in the shared preferences
+     */
+    public void finishDemanding() {
+        stopMyServices();
+        removeDemand();
+        addHistoryToFireBase();
+
+        flag_book = true;
+        flag_demand = false;
+        SharedPreferences.Editor editor = sharedPref.edit();
+        editor.putBoolean(getString(R.string.pref_demand_book_satus), flag_book);
+        editor.putBoolean(getString(R.string.pref_demand_status), flag_demand);
+        editor.apply();
+    }
+
+    /**
+     * write into the history that a demand book a supply
+     */
+    public void addHistoryToFireBase(){
+        Log.d(TAG, "addHistoryToFireBase");
+        String supplyUserId = resultKey.get(index);
+
+        /*
+
+        globalHistory.setDemandUser();
+        globalHistory.setSupplyUser();
+
+        globalHistory.setGlobalHistory(); //for supply
+        globalHistory.updateGlobalHistory(); //for demand
+
+        refHistory.push().getKey() !!!! //todo to add in supply
+
+        globalHistory.setGlobalHistory(refHistory.push().getKey(),//todo...
+                new GeoLocation(resultLocation.get(index).latitude, resultLocation.get(index).longitude),
+                new GeoLocation(resultLocation.get(index).latitude, resultLocation.get(index).longitude),
+                supplyUserId, demandUserId, remainingSeats, requestingSeats);*/
     }
 }

@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="utf-8"?>
+<android.support.constraint.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    tools:context="com.realtimehitchhiker.hitchgo.ResultSupplyActivity">
+
+    <TextView
+        android:id="@+id/textView_resultSupplyProfile"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginEnd="8dp"
+        android:layout_marginStart="8dp"
+        android:layout_marginTop="8dp"
+        android:text="Supply Profile"
+        app:layout_constraintEnd_toStartOf="@+id/button_result_next"
+        app:layout_constraintStart_toEndOf="@+id/button_result_prev"
+        app:layout_constraintTop_toBottomOf="@+id/imageView_result" />
+
+    <ImageView
+        android:id="@+id/imageView_result"
+        android:layout_width="200dp"
+        android:layout_height="200dp"
+        android:layout_marginEnd="8dp"
+        android:layout_marginStart="8dp"
+        android:layout_marginTop="24dp"
+        android:background="@drawable/com_facebook_profile_picture_blank_square"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <Button
+        android:id="@+id/button_call"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="24dp"
+        android:layout_marginEnd="8dp"
+        android:layout_marginStart="8dp"
+        android:onClick="callPhoneNumberSupply"
+        android:text="@string/button_result_call_demand"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent" />
+
+    <Button
+        android:id="@+id/button_result_next"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginEnd="16dp"
+        android:minHeight="0dp"
+        android:minWidth="0dp"
+        android:onClick="nextSupply"
+        android:text="@string/button_next"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toTopOf="@+id/textView_resultSupplyProfile" />
+
+    <Button
+        android:id="@+id/button_result_prev"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="16dp"
+        android:minHeight="0dp"
+        android:minWidth="0dp"
+        android:onClick="prevSupply"
+        android:text="@string/button_prev"
+        app:layout_constraintBottom_toBottomOf="@+id/button_result_next"
+        app:layout_constraintStart_toStartOf="parent" />
+
+    <TextView
+        android:id="@+id/textView_resultSupplyDetails"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:text="Supply Details"
+        app:layout_constraintStart_toStartOf="@+id/textView_resultSupplyProfile"
+        app:layout_constraintTop_toBottomOf="@+id/textView_resultSupplyProfile" />
+
+    <Button
+        android:id="@+id/button_book"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="32dp"
+        android:layout_marginEnd="8dp"
+        android:layout_marginStart="8dp"
+        android:onClick="BookSupply"
+        android:text="@string/button_result_map"
+        app:layout_constraintBottom_toTopOf="@+id/button_call"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent" />
+</android.support.constraint.ConstraintLayout>

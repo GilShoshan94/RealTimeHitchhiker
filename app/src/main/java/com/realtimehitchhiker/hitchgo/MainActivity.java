@@ -10,8 +10,6 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
-import android.content.res.Configuration;
-import android.content.res.Resources;
 import android.graphics.Bitmap;
 import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
@@ -30,7 +28,6 @@ import android.telephony.TelephonyManager;
 import android.text.Editable;
 import android.text.InputFilter;
 import android.text.InputType;
-import android.util.DisplayMetrics;
 import android.util.Log;
 import android.view.View;
 import android.widget.AdapterView;
@@ -61,11 +58,8 @@ import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.database.Query;
 import com.google.firebase.database.ValueEventListener;
 
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.List;
-import java.util.Locale;
 import java.util.Objects;
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -127,13 +121,16 @@ public class MainActivity extends AppCompatActivity implements SupplyDialogFragm
     private Button btnLog;
     private Button btnSupply;
     private Button btnDemand;
+    private Button btnResultSupply;
+    private Button btnResultDemand;
     private TextView txtShowLocation, txtWelcome;
     private ImageView imProfile;
     private ImageButton imageButtonSetting;
     private Spinner spinnerLanguage;
 
     // BroadcastReceiver (for inter-modules/services communication)
-    private BroadcastReceiver broadcastReceiverLocationUpdate, broadcastReceiverLocionProviderOff, broadcastReceiverSupplyFound;
+    private BroadcastReceiver broadcastReceiverLocationUpdate, broadcastReceiverLocionProviderOff,
+            broadcastReceiverSupplyFound, broadcastReceiverDemandFound;
 
     // Flags to store various states (yes or no) of the app
     private boolean flag_login = false;
@@ -177,6 +174,8 @@ public class MainActivity extends AppCompatActivity implements SupplyDialogFragm
         btnLog = findViewById(R.id.button_login);
         btnSupply = findViewById(R.id.button_supply);
         btnDemand = findViewById(R.id.button_demand);
+        btnResultSupply = findViewById(R.id.button_seeResultSupply);
+        btnResultDemand = findViewById(R.id.button_seeResultDemand);
         imageButtonSetting = findViewById(R.id.imageButton_settings);
         imProfile = findViewById(R.id.profile_image);
         //imProfile.setMaxHeight(100);
@@ -281,7 +280,20 @@ public class MainActivity extends AppCompatActivity implements SupplyDialogFragm
                     Bundle bundle = new Bundle(intent.getExtras());
                     Log.d(TAG,"broadcastReceiverSupplyFound : onReceive " + bundle.toString());
 
-                    callResultActivity(bundle);
+                    callDemandResultActivity(bundle);
+                }
+            };
+        }
+        if(broadcastReceiverDemandFound == null) {
+            Log.d(TAG,"broadcastReceiverDemandFound : INITIALIZE");
+            broadcastReceiverDemandFound = new BroadcastReceiver() {
+                @Override
+                public void onReceive(Context context, Intent intent) {
+                    Log.d(TAG,"broadcastReceiverDemandFound : onReceive " + intent.toString());
+                    Bundle bundle = new Bundle(intent.getExtras());
+                    Log.d(TAG,"broadcastReceiverDemandFound : onReceive " + bundle.toString());
+
+                    callDemandResultActivity(bundle);
                 }
             };
         }
@@ -291,6 +303,7 @@ public class MainActivity extends AppCompatActivity implements SupplyDialogFragm
         localBroadcastManager.registerReceiver(broadcastReceiverLocationUpdate,new IntentFilter(LocationService.BROADCAST_ACTION_LOCATION_UPDATE));
         localBroadcastManager.registerReceiver(broadcastReceiverLocionProviderOff,new IntentFilter(LocationService.BROADCAST_ACTION_LOCATION_OFF));
         localBroadcastManager.registerReceiver(broadcastReceiverSupplyFound,new IntentFilter(FirebaseService.BROADCAST_ACTION_SUPPLY_FOUND));
+        localBroadcastManager.registerReceiver(broadcastReceiverDemandFound,new IntentFilter(FirebaseService.BROADCAST_ACTION_DEMAND_FOUND));
     }
 
     @Override
@@ -311,6 +324,9 @@ public class MainActivity extends AppCompatActivity implements SupplyDialogFragm
         }
         if(broadcastReceiverSupplyFound != null){
             localBroadcastManager.unregisterReceiver(broadcastReceiverSupplyFound);
+        }
+        if(broadcastReceiverDemandFound != null){
+            localBroadcastManager.unregisterReceiver(broadcastReceiverDemandFound);
         }
     }
 
@@ -499,11 +515,15 @@ public class MainActivity extends AppCompatActivity implements SupplyDialogFragm
         if (flag_supply){
             btnSupply.setText(R.string.button_supply_cancel);
             btnDemand.setEnabled(false);
+            btnResultSupply.setEnabled(true);
+            btnResultDemand.setEnabled(false);
         }
         //else not already supplying
         else {
             btnSupply.setText(R.string.button_supply);
             btnDemand.setEnabled(true);
+            btnResultSupply.setEnabled(false);
+            btnResultDemand.setEnabled(false);
         }
 
         //setOnClickListener for the Supply button
@@ -535,11 +555,15 @@ public class MainActivity extends AppCompatActivity implements SupplyDialogFragm
         if (flag_demand){
             btnDemand.setText(R.string.button_demand_cancel);
             btnSupply.setEnabled(false);
+            btnResultSupply.setEnabled(false);
+            btnResultDemand.setEnabled(true);
         }
         //else not already demanding
         else {
             btnDemand.setText(R.string.button_demand);
             btnSupply.setEnabled(true);
+            btnResultSupply.setEnabled(false);
+            btnResultDemand.setEnabled(false);
         }
 
         //setOnClickListener for the Demand button
@@ -581,6 +605,8 @@ public class MainActivity extends AppCompatActivity implements SupplyDialogFragm
             //Show the UI for logged in users
             btnSupply.setVisibility(View.VISIBLE);
             btnDemand.setVisibility(View.VISIBLE);
+            btnResultSupply.setVisibility(View.VISIBLE);
+            btnResultDemand.setVisibility(View.VISIBLE);
             txtShowLocation.setVisibility(View.VISIBLE);
             imProfile.setVisibility(View.VISIBLE);
             imageButtonSetting.setVisibility(View.VISIBLE);
@@ -607,8 +633,7 @@ public class MainActivity extends AppCompatActivity implements SupplyDialogFragm
             }).execute(photoUrl);
 
             //initialize supply and demand button accordingly to the user state
-            initializeSupplyButton();
-            initializeDemandButton();
+            checkSupplyDemandStatusAndUpdateUI();
 
             //Make sure the services are started
             enableFirebaseAndLocationService();
@@ -623,6 +648,8 @@ public class MainActivity extends AppCompatActivity implements SupplyDialogFragm
             //Hide the UI
             btnSupply.setVisibility(View.INVISIBLE);
             btnDemand.setVisibility(View.INVISIBLE);
+            btnResultSupply.setVisibility(View.INVISIBLE);
+            btnResultDemand.setVisibility(View.INVISIBLE);
             txtShowLocation.setVisibility(View.INVISIBLE);
             imProfile.setVisibility(View.INVISIBLE);
             imageButtonSetting.setVisibility(View.INVISIBLE);
@@ -763,13 +790,42 @@ public class MainActivity extends AppCompatActivity implements SupplyDialogFragm
     }
 
     /**
-     * start Result activity and send to it important data for result
+     * start DemandResult activity and send to it important data for result
      */
-    public void callResultActivity(Bundle bundle) {
-        Log.d(TAG, "MAIN_callResultActivity bundle.toString() = " + bundle.toString() );
-        Intent resultIntent = new Intent(this, ResultActivity.class);
+    public void callDemandResultActivity(Bundle bundle) {
+        Log.d(TAG, "MAIN_callDemandResultActivity bundle.toString() = " + bundle.toString() );
+        Intent resultIntent = new Intent(this, ResultDemandActivity.class);
 
         resultIntent.putExtras(bundle);
+        startActivity(resultIntent);
+    }
+
+    /**
+     * start DemandResult activity from the button_seeResultDemand
+     */
+    public void callDemandResultActivity(View view) {
+        Log.d(TAG, "MAIN_callDemandResultActivity");
+        Intent resultIntent = new Intent(this, ResultDemandActivity.class);
+        startActivity(resultIntent);
+    }
+
+    /**
+     * start SupplyResult activity and send to it important data for result
+     */
+    public void callSupplyResultActivity(Bundle bundle) {
+        Log.d(TAG, "MAIN_callSupplyResultActivity bundle.toString() = " + bundle.toString() );
+        Intent resultIntent = new Intent(this, ResultSupplyActivity.class);
+
+        resultIntent.putExtras(bundle);
+        startActivity(resultIntent);
+    }
+
+    /**
+     * start SupplyResult activity from the button_seeSupplyDemand
+     */
+    public void callSupplyResultActivity(View view) {
+        Log.d(TAG, "MAIN_callSupplyResultActivity");
+        Intent resultIntent = new Intent(this, ResultSupplyActivity.class);
         startActivity(resultIntent);
     }
 
@@ -950,10 +1006,11 @@ public class MainActivity extends AppCompatActivity implements SupplyDialogFragm
             @Override
             public void onDataChange(DataSnapshot dataSnapshot) {
                 Log.d(TAG, "DATABASE checkSupplyDemandStatusAndUpdateUI: " + dataSnapshot.toString());
-                if(dataSnapshot.exists()){
-                    flag_demand = true;
-                    initializeDemandButton();
-                }
+                flag_demand = dataSnapshot.exists();
+                SharedPreferences.Editor editor = sharedPref.edit();
+                editor.putBoolean(getString(R.string.pref_demand_status), flag_demand);
+                editor.apply();
+                initializeDemandButton();
             }
 
             @Override
@@ -968,10 +1025,11 @@ public class MainActivity extends AppCompatActivity implements SupplyDialogFragm
             @Override
             public void onDataChange(DataSnapshot dataSnapshot) {
                 Log.d(TAG, "DATABASE checkSupplyDemandStatusAndUpdateUI: " + dataSnapshot.toString());
-                if(dataSnapshot.exists()){
-                    flag_supply = true;
-                    initializeSupplyButton();
-                }
+                flag_supply = dataSnapshot.exists();
+                SharedPreferences.Editor editor = sharedPref.edit();
+                editor.putBoolean(getString(R.string.pref_supply_status), flag_supply);
+                editor.apply();
+                initializeSupplyButton();
             }
 
             @Override
@@ -1012,6 +1070,7 @@ public class MainActivity extends AppCompatActivity implements SupplyDialogFragm
     public void onSupplyDialogPositiveClick(DialogFragment dialog) {
         flag_supply = true;
         btnSupply.setText(R.string.button_supply_cancel);
+        btnResultSupply.setEnabled(true);
 
         SharedPreferences.Editor editor = sharedPref.edit();
         editor.putBoolean(getString(R.string.pref_supply_status), flag_supply);
@@ -1019,12 +1078,14 @@ public class MainActivity extends AppCompatActivity implements SupplyDialogFragm
 
         //disable the Demand button (cannot demand and supply in simultaneously)
         btnDemand.setEnabled(false);
+        btnResultDemand.setEnabled(false);
     }
 
     @Override
     public void onSupplyDialogNegativeClick(DialogFragment dialog) {
         flag_supply = false;
         btnSupply.setText(R.string.button_supply);
+        btnResultSupply.setEnabled(false);
 
         SharedPreferences.Editor editor = sharedPref.edit();
         editor.putBoolean(getString(R.string.pref_supply_status), flag_supply);
@@ -1081,6 +1142,7 @@ public class MainActivity extends AppCompatActivity implements SupplyDialogFragm
 
         flag_demand = true;
         btnDemand.setText(R.string.button_demand_cancel);
+        btnResultDemand.setEnabled(true);
 
         SharedPreferences.Editor editor = sharedPref.edit();
         editor.putBoolean(getString(R.string.pref_demand_status), flag_demand);
@@ -1088,12 +1150,14 @@ public class MainActivity extends AppCompatActivity implements SupplyDialogFragm
 
         //disable the Supply button (cannot demand and supply in simultaneously)
         btnSupply.setEnabled(false);
+        btnResultSupply.setEnabled(false);
     }
 
     @Override
     public void onDemandDialogNegativeClick(DialogFragment dialog) {
         flag_demand = false;
         btnDemand.setText(R.string.button_demand);
+        btnResultDemand.setEnabled(false);
 
         SharedPreferences.Editor editor = sharedPref.edit();
         editor.putBoolean(getString(R.string.pref_demand_status), flag_demand);

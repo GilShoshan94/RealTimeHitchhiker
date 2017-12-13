@@ -31,6 +31,8 @@
     <string name="pref_supply_pet" translatable="false">supplyPetBool</string>
     <string name="pref_demand_pet" translatable="false">demandPetBool</string>
     <string name="pref_language" translatable="false">languageString</string>
+    <string name="pref_demand_book_satus" translatable="false">bookBool</string>
+    <string name="pref_resultKey_forDemand" translatable="false">resultKey_forDemandStringSet</string>
 
 
     <!-- Notification -->
@@ -92,10 +94,12 @@
     <string name="settings_radius">radius</string>
     <string name="settings_radius_unit">km</string>
 
-    <!-- Result -->
+    <!-- Result (Demand and Supply) -->
     <string name="result">Drive confirmation</string>
     <string name="button_result_call">Call driver</string>
+    <string name="button_result_call_demand">Call rider</string>
     <string name="button_result_book">Book driver</string>
+    <string name="button_result_map">Find rider on map</string>
     <string name="button_next" translatable="false">\u003E</string>
     <string name="button_prev" translatable="false">\u003C</string>
     <string name="txtDetails_dest">Destination :\u0020</string>  <!-- \u0020 is unicode for character space : " " -->
@@ -104,8 +108,11 @@
     <string name="txtDetails_petAllowed_true">Yes</string>
     <string name="txtDetails_petAllowed_false">No</string>
     <string name="txtDetails_remainingSeats">Remaining seats :\u0020</string>
+    <string name="txtDetails_requestingSeats">Requesting seats :\u0020</string>
     <string name="txtProfile_name">Driver\'s name :\u0020</string>
     <string name="txtProfile_phone">Driver\'s phone :\u0020</string>
+    <string name="toast_all_seats_gone">Could not book, all the seats are already gone…</string>
+    <string name="toast_all_seats_gone_or_supply_canceled">Could not book, all the seats are already gone…</string>
 
     <!-- Example General settings (not in use)-->
     <string name="pref_header_general">General</string>
