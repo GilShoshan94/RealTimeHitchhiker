@@ -9,6 +9,7 @@ import android.content.Context;
 import android.location.Address;
 import android.location.Geocoder;
 import android.location.Location;
+import android.util.Log;
 
 import com.firebase.geofire.GeoLocation;
 import com.firebase.geofire.LocationCallback;
@@ -259,6 +260,7 @@ public class MyGlobalHistory {
             if (addressList.size() > 0) {
                 Address address = addressList.get(0);
                 int lines = address.getMaxAddressLineIndex();
+                Log.d("MyGlobalHistory", "getReverseGeoCoding lines = " + lines);
                 if (lines > 0) {
                     StringBuilder addressLine = new StringBuilder(address.getAddressLine(0));
                     for (int i = 1 ; i < lines; i++){
@@ -281,8 +283,6 @@ public class MyGlobalHistory {
                     adminArea = adminArea + ", ";
                 if(countryCode == null)
                     countryCode = "";
-                else
-                    countryCode = countryCode + ", ";
 
                 if (Objects.equals(locality, "") && Objects.equals(adminArea, "") && Objects.equals(countryCode, "")) {
                     return "unknown address";

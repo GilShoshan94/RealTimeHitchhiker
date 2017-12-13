@@ -1,16 +1,16 @@
 package com.realtimehitchhiker.hitchgo;
 
-import android.app.Activity;
 import android.app.Dialog;
+import android.app.DialogFragment;
 import android.content.Context;
 import android.content.DialogInterface;
+import android.content.Intent;
 import android.content.SharedPreferences;
 import android.location.Address;
 import android.location.Geocoder;
 import android.os.Bundle;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
-import android.support.v4.app.DialogFragment;
 import android.support.v7.app.AlertDialog;
 import android.util.Log;
 import android.view.LayoutInflater;
@@ -18,17 +18,25 @@ import android.view.View;
 import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.EditText;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import com.firebase.geofire.GeoFire;
 import com.firebase.geofire.GeoLocation;
+import com.google.android.gms.common.api.Status;
+import com.google.android.gms.location.places.AutocompleteFilter;
+import com.google.android.gms.location.places.Place;
+import com.google.android.gms.location.places.ui.PlaceAutocompleteFragment;
+import com.google.android.gms.location.places.ui.PlaceSelectionListener;
+import com.google.android.gms.location.places.ui.SupportPlaceAutocompleteFragment;
+import com.google.android.gms.maps.model.LatLng;
+import com.google.android.gms.maps.model.LatLngBounds;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
 
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -56,10 +64,13 @@ public class SupplyDialogFragment extends DialogFragment implements CounterHandl
     private int seats_in_car;
 
     // UI objects in the layer
-    private EditText txtDestination;
+    private PlaceAutocompleteFragment autocompleteFragment;
+    private Place placeDestination;
+    private EditText autocompleteEditText;
     private TextView txtFuelPrice;
     private TextView txtSeatsSupply;
     private CheckBox checkBoxPetSupply;
+    private Button positiveButton;
     //todo String currency...
     String currency = "NIS";
 
@@ -106,6 +117,7 @@ public class SupplyDialogFragment extends DialogFragment implements CounterHandl
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
         facebookUserId = getArguments().getString("facebookUserId","-1");
         latitude = getArguments().getDouble("latitude",90.0);
         longitude = getArguments().getDouble("longitude",0.0);
@@ -147,8 +159,7 @@ public class SupplyDialogFragment extends DialogFragment implements CounterHandl
                     public void onClick(DialogInterface dialog, int whichButton) {
 
                         allow_pet_supply = checkBoxPetSupply.isChecked();
-                        String destination = txtDestination.getText().toString();
-                        //todo destination validation...
+                        String destination = placeDestination.getAddress().toString();
                         if(Objects.equals(destination, "") || Objects.equals(destination, " "))
                             destination = "Forgot to tell...";
 
@@ -165,13 +176,14 @@ public class SupplyDialogFragment extends DialogFragment implements CounterHandl
                         geoFireSupply.setLocation(facebookUserId, new GeoLocation(latitude, longitude));
 
                         FirebaseUser currentUser = FirebaseAuth.getInstance().getCurrentUser();
+                        assert currentUser != null;
                         String name = currentUser.getDisplayName();
                         MyGlobalHistory globalHistory = new MyGlobalHistory(refHistory);
                         GeoLocation fromLocation = new GeoLocation(latitude,longitude);
+                        GeoLocation toLocation = new GeoLocation(placeDestination.getLatLng().latitude,placeDestination.getLatLng().longitude);
                         Map<String, Object> supplyUser = globalHistory.setSupplyUser(facebookUserId, name);
                         Context context = getActivity();
-                        //todo destination  !!
-                        globalHistory.setGlobalHistory(context, historyKey, fromLocation, fromLocation, supplyUser, seats_in_car);
+                        globalHistory.setGlobalHistory(context, historyKey, fromLocation, toLocation, supplyUser, seats_in_car);
 
                         // Send the positive button event back to the host activity
                         mListener.onSupplyDialogPositiveClick(SupplyDialogFragment.this);
@@ -195,8 +207,6 @@ public class SupplyDialogFragment extends DialogFragment implements CounterHandl
                 .setCancelable(false);
 
         //UI initialization of links
-        txtDestination = dialogView.findViewById(R.id.editText_destination);
-
         txtFuelPrice = dialogView.findViewById(R.id.textView_fuel_price);
         Button btnPlusPrice = dialogView.findViewById(R.id.button_fuel_plus);
         Button btnMinusPrice = dialogView.findViewById(R.id.button_fuel_minus);
@@ -252,6 +262,64 @@ public class SupplyDialogFragment extends DialogFragment implements CounterHandl
         });
 
         return builder.create();
+    }
+
+    @Override
+    public void onStart() {
+        super.onStart();
+
+        //get the dialog instance to be able to manipulate (disable/enable) the positive button
+        AlertDialog myDialog = (AlertDialog) getDialog();
+        Log.d(TAG, "AlertDialog myDialog = (AlertDialog) getDialog();");
+        if (myDialog != null) {
+            Log.d(TAG, "myDialog != null" + myDialog.toString());
+            positiveButton = myDialog.getButton(AlertDialog.BUTTON_POSITIVE);
+            positiveButton.setEnabled(false);
+        }
+
+        //set the Google widget
+        autocompleteFragment = (PlaceAutocompleteFragment)
+                getFragmentManager().findFragmentById(R.id.place_autocomplete_fragment_supply);
+        Log.i(TAG, "Place: " + autocompleteFragment.toString());
+
+        autocompleteEditText = (EditText)autocompleteFragment.getView().findViewById(R.id.place_autocomplete_search_input);
+        autocompleteEditText.setTextColor(autocompleteEditText.getHintTextColors());//todo check
+        AutocompleteFilter autocompleteFilter = new AutocompleteFilter.Builder()
+                .setTypeFilter(AutocompleteFilter.TYPE_FILTER_NONE)
+                //.setCountry("IL")
+                .build();
+        autocompleteFragment.setHint(getString(R.string.txt_hint_destination));
+        autocompleteFragment.setFilter(autocompleteFilter);
+        autocompleteFragment.setBoundsBias(new LatLngBounds(
+                new LatLng(latitude-0.9, longitude-0.9),
+                new LatLng(latitude+0.9, longitude+0.9)));
+        autocompleteFragment.setOnPlaceSelectedListener((new PlaceSelectionListener() {
+            @Override
+            public void onPlaceSelected(Place place) {
+                Log.i(TAG, "Place1: " + place.getName());
+                Log.i(TAG, "Place3: " + place.toString());
+                Log.i(TAG, "Place4 GOOD: " + place.getAddress());
+                Log.i(TAG, "Place5: " + place.getViewport().toString());
+                Log.i(TAG, "Place6: " + place.getLatLng());
+                placeDestination = place;
+                positiveButton.setEnabled(true);
+            }
+
+            @Override
+            public void onError(Status status) {
+                Log.i(TAG, "An error occurred: " + status);
+            }
+        }));
+
+        autocompleteFragment.getView().findViewById(R.id.place_autocomplete_clear_button)
+                .setOnClickListener(new View.OnClickListener() {
+                    @Override
+                    public void onClick(View view) {
+                        autocompleteFragment.setText("");
+                        view.setVisibility(View.GONE);
+                        positiveButton.setEnabled(false);
+                    }
+                });
     }
 
     @Override

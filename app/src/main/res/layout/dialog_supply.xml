@@ -11,20 +11,16 @@
         android:layout_height="wrap_content">
 
         <fragment
-            android:id="@+id/editText_destination"
-            style="@style/Widget.AppCompat.AutoCompleteTextView"
-            android:layout_width="wrap_content"
+            android:id="@+id/place_autocomplete_fragment_supply"
+            android:name="com.google.android.gms.location.places.ui.PlaceAutocompleteFragment"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
-            android:ems="10"
-            android:hint="@string/txt_hint_destination"
-            android:inputType="text"
             android:visibility="visible"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintHorizontal_bias="0.5"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toTopOf="parent"
-            android:name="com.google.android.gms.location.places.ui.PlaceAutocompleteFragment" />
+            app:layout_constraintTop_toTopOf="parent" />
 
         <TextView
             android:id="@+id/textView_fuel_price"
@@ -33,9 +29,9 @@
             android:layout_marginTop="32dp"
             android:text="@string/txt_fuel_price"
             android:visibility="visible"
-            app:layout_constraintEnd_toEndOf="@+id/editText_destination"
-            app:layout_constraintStart_toStartOf="@+id/editText_destination"
-            app:layout_constraintTop_toBottomOf="@+id/editText_destination" />
+            app:layout_constraintEnd_toEndOf="@+id/place_autocomplete_fragment_supply"
+            app:layout_constraintStart_toStartOf="@+id/place_autocomplete_fragment_supply"
+            app:layout_constraintTop_toBottomOf="@+id/place_autocomplete_fragment_supply" />
 
         <TextView
             android:id="@+id/textView_seats_supply"
@@ -66,23 +62,25 @@
             android:id="@+id/button_fuel_minus"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:layout_marginStart="32dp"
             android:minHeight="0dp"
             android:minWidth="0dp"
             android:text="@string/button_minus"
             android:visibility="visible"
             app:layout_constraintBaseline_toBaselineOf="@+id/textView_fuel_price"
-            app:layout_constraintStart_toStartOf="@+id/editText_destination" />
+            app:layout_constraintStart_toStartOf="@+id/place_autocomplete_fragment_supply" />
 
         <Button
             android:id="@+id/button_fuel_plus"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:layout_marginEnd="32dp"
             android:minHeight="0dp"
             android:minWidth="0dp"
             android:text="@string/button_plus"
             android:visibility="visible"
             app:layout_constraintBaseline_toBaselineOf="@+id/textView_fuel_price"
-            app:layout_constraintEnd_toEndOf="@+id/editText_destination" />
+            app:layout_constraintEnd_toEndOf="@+id/place_autocomplete_fragment_supply" />
 
         <Button
             android:id="@+id/button_seats_supply_minus"

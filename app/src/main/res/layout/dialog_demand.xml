@@ -10,15 +10,12 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content">
 
-        <AutoCompleteTextView
-            android:id="@+id/editText_destination_demand"
-            style="@style/Widget.AppCompat.AutoCompleteTextView"
-            android:layout_width="wrap_content"
+        <fragment
+            android:id="@+id/place_autocomplete_fragment_demand"
+            android:name="com.google.android.gms.location.places.ui.PlaceAutocompleteFragment"
+            android:layout_width="200dp"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
-            android:ems="10"
-            android:hint="@string/txt_hint_destination"
-            android:inputType="text"
             android:visibility="visible"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintHorizontal_bias="0.5"
@@ -32,9 +29,9 @@
             android:layout_marginTop="32dp"
             android:text="@string/txt_seat_demand"
             android:visibility="visible"
-            app:layout_constraintEnd_toEndOf="@+id/editText_destination_demand"
-            app:layout_constraintStart_toStartOf="@+id/editText_destination_demand"
-            app:layout_constraintTop_toBottomOf="@+id/editText_destination_demand" />
+            app:layout_constraintEnd_toEndOf="@+id/place_autocomplete_fragment_demand"
+            app:layout_constraintStart_toStartOf="@+id/place_autocomplete_fragment_demand"
+            app:layout_constraintTop_toBottomOf="@+id/place_autocomplete_fragment_demand" />
 
         <CheckBox
             android:id="@+id/checkBox_pet_demand"
@@ -59,7 +56,7 @@
             android:text="@string/button_minus"
             android:visibility="visible"
             app:layout_constraintBaseline_toBaselineOf="@+id/textView_seats_demand"
-            app:layout_constraintStart_toStartOf="@+id/editText_destination_demand" />
+            app:layout_constraintStart_toStartOf="@+id/place_autocomplete_fragment_demand" />
 
         <Button
             android:id="@+id/button_seats_demand_plus"
@@ -70,7 +67,7 @@
             android:text="@string/button_plus"
             android:visibility="visible"
             app:layout_constraintBaseline_toBaselineOf="@+id/textView_seats_demand"
-            app:layout_constraintEnd_toEndOf="@+id/editText_destination_demand" />
+            app:layout_constraintEnd_toEndOf="@+id/place_autocomplete_fragment_demand" />
 
     </android.support.constraint.ConstraintLayout>
 </ScrollView>

@@ -169,7 +169,7 @@ public class DemandDialogFragment extends DialogFragment {
                 .setCancelable(false);
 
         //UI initialization of links
-        txtDestination = dialogView.findViewById(R.id.editText_destination_demand);
+        txtDestination = dialogView.findViewById(R.id.place_autocomplete_fragment_demand);
 
         txtSeatsDemand = dialogView.findViewById(R.id.textView_seats_demand);
         Button btnPlusSeats = dialogView.findViewById(R.id.button_seats_demand_plus);

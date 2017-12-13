@@ -10,6 +10,9 @@
     <string name="twitter_consumer_key" translatable="false">YOUR_CONSUMER_KEY</string>
     <string name="twitter_consumer_secret" translatable="false">YOUR_CONSUMER_SECRET</string>
 
+    <!-- Google API key -->
+    <string name="google_api_key_map_and_places" translatable="false">AIzaSyA9CESc-y4ilHJRNMne7_H8PsUeAynaNm0</string>
+
     <!-- Firebase "folder" name / structure of the database -->
     <string name="firebase_folder_users" translatable="false">users/</string>
     <string name="firebase_folder_supply" translatable="false">supply/</string>
