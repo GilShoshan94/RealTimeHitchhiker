@@ -53,6 +53,7 @@ public class ResultDemandActivity extends AppCompatActivity {
     private GeoFire geoFireSupply;
     private GeoFire geoFireDemand;
     private MyGlobalHistory globalHistory;
+    private String historyKey;
 
     private Button btnCall;
     private Button btnNext;
@@ -147,7 +148,8 @@ public class ResultDemandActivity extends AppCompatActivity {
 
     private void updateResultUI(){
         //If we booked already than, we can just see our supply and we cannot rebook
-        if(flag_book){
+        //Or if there is no key found
+        if(flag_book || resultKey.size()==0){
             btnBook.setEnabled(false);
             btnNext.setEnabled(false);
             btnPrev.setEnabled(false);
@@ -272,6 +274,8 @@ public class ResultDemandActivity extends AppCompatActivity {
                 .append(supply.remainingSeats);
 
         txtShowSupplyDetails.setText(stringBuilder.toString());
+
+        historyKey = supply.historyKey;
     }
 
     /**
@@ -441,20 +445,7 @@ public class ResultDemandActivity extends AppCompatActivity {
     public void addHistoryToFireBase(){
         Log.d(TAG, "addHistoryToFireBase");
         String supplyUserId = resultKey.get(index);
-
-        /*
-
-        globalHistory.setDemandUser();
-        globalHistory.setSupplyUser();
-
-        globalHistory.setGlobalHistory(); //for supply
-        globalHistory.updateGlobalHistory(); //for demand
-
-        refHistory.push().getKey() !!!! //todo to add in supply
-
-        globalHistory.setGlobalHistory(refHistory.push().getKey(),//todo...
-                new GeoLocation(resultLocation.get(index).latitude, resultLocation.get(index).longitude),
-                new GeoLocation(resultLocation.get(index).latitude, resultLocation.get(index).longitude),
-                supplyUserId, demandUserId, remainingSeats, requestingSeats);*/
+        Map<String, Object> demandUser = globalHistory.setDemandUser(facebookUserId,currentUser.getDisplayName(),demand_seats);
+        globalHistory.updateGlobalHistory(historyKey, demandUser, demand_seats);
     }
 }

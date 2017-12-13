@@ -40,6 +40,7 @@ dependencies {
     // Required only if Twitter login support is required
     //compile("com.twitter.sdk.android:twitter-core:3.0.0@aar") { transitive = true }
     compile 'io.michaelrocks:libphonenumber-android:8.8.5'
+    compile 'com.google.android.gms:play-services-places:11.4.2'
 }
 
 

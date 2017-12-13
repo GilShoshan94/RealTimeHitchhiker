@@ -5,6 +5,8 @@ import android.app.Dialog;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.SharedPreferences;
+import android.location.Address;
+import android.location.Geocoder;
 import android.os.Bundle;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
@@ -20,9 +22,15 @@ import android.widget.TextView;
 
 import com.firebase.geofire.GeoFire;
 import com.firebase.geofire.GeoLocation;
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
 
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
 /**
@@ -38,6 +46,8 @@ public class SupplyDialogFragment extends DialogFragment implements CounterHandl
 
     private DatabaseReference refSupply;
     private GeoFire geoFireSupply;
+    private DatabaseReference refHistory;
+    private Geocoder geocoder;
 
     // SharedPreferences parameters
     private SharedPreferences sharedPref;
@@ -103,6 +113,7 @@ public class SupplyDialogFragment extends DialogFragment implements CounterHandl
         DatabaseReference myDataBaseRef = FirebaseDatabase.getInstance().getReference();
         refSupply = myDataBaseRef.child(getString(R.string.firebase_folder_supply));
         geoFireSupply = new GeoFire(myDataBaseRef.child(getString(R.string.firebase_folder_geofire_supply)));
+        refHistory = myDataBaseRef.child("history/");
         //Load the sharedPreferences
         sharedPref = getActivity().getSharedPreferences(
                 getString(R.string.preference_file_key), Context.MODE_PRIVATE);
@@ -111,6 +122,8 @@ public class SupplyDialogFragment extends DialogFragment implements CounterHandl
         allow_pet_supply = sharedPref.getBoolean(getString(R.string.pref_supply_pet), false);
 
         setCancelable(false);
+
+        geocoder = new Geocoder(getActivity());
     }
 
     @NonNull
@@ -145,9 +158,20 @@ public class SupplyDialogFragment extends DialogFragment implements CounterHandl
                         editor.putBoolean(getString(R.string.pref_supply_pet), allow_pet_supply);
                         editor.apply();
 
-                        MySupply mySupply = new MySupply(destination, seats_in_car, fuel_price, currency, allow_pet_supply);
+                        String historyKey = refSupply.push().getKey();
+
+                        MySupply mySupply = new MySupply(destination, seats_in_car, fuel_price, currency, allow_pet_supply, historyKey);
                         refSupply.child(facebookUserId).setValue(mySupply);
                         geoFireSupply.setLocation(facebookUserId, new GeoLocation(latitude, longitude));
+
+                        FirebaseUser currentUser = FirebaseAuth.getInstance().getCurrentUser();
+                        String name = currentUser.getDisplayName();
+                        MyGlobalHistory globalHistory = new MyGlobalHistory(refHistory);
+                        GeoLocation fromLocation = new GeoLocation(latitude,longitude);
+                        Map<String, Object> supplyUser = globalHistory.setSupplyUser(facebookUserId, name);
+                        Context context = getActivity();
+                        //todo destination  !!
+                        globalHistory.setGlobalHistory(context, historyKey, fromLocation, fromLocation, supplyUser, seats_in_car);
 
                         // Send the positive button event back to the host activity
                         mListener.onSupplyDialogPositiveClick(SupplyDialogFragment.this);
@@ -242,5 +266,49 @@ public class SupplyDialogFragment extends DialogFragment implements CounterHandl
         fuel_price = (int)number;
         txtFuelPrice.setText(R.string.txt_fuel_price);
         txtFuelPrice.append(" : " + fuel_price + " " + currency);
+    }
+
+    private String getReverseGeoCoding() {
+        try {
+            List<Address> addressList = geocoder.getFromLocation(
+                    latitude, longitude, 1);
+            if (addressList.size() > 0) {
+                Address address = addressList.get(0);
+                int lines = address.getMaxAddressLineIndex();
+                if (lines > 0) {
+                    StringBuilder addressLine = new StringBuilder(address.getAddressLine(0));
+                    for (int i = 1 ; i < lines; i++){
+                        addressLine.append(", ").append(address.getAddressLine(i));
+                    }
+                    return addressLine.toString();
+                }
+
+                String locality = address.getLocality();
+                String adminArea = address.getAdminArea();
+                String countryCode = address.getCountryCode();
+
+                if(locality == null)
+                    locality = "";
+                else
+                    locality = locality + ", ";
+                if(adminArea == null)
+                    adminArea = "";
+                else
+                    adminArea = adminArea + ", ";
+                if(countryCode == null)
+                    countryCode = "";
+                else
+                    countryCode = countryCode + ", ";
+
+                if (Objects.equals(locality, "") && Objects.equals(adminArea, "") && Objects.equals(countryCode, "")) {
+                    return "unknown address";
+                }
+                else
+                    return locality + adminArea + countryCode;
+            }
+        } catch (IOException e) {
+            // Can safely ignore
+        }
+        return "unknown address";
     }
 }
