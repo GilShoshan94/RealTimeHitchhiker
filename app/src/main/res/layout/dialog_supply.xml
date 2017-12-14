@@ -10,9 +10,20 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content">
 
+        <!--<FrameLayout
+            android:id="@+id/place_autocomplete_fragment_supply_content"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:visibility="visible"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintHorizontal_bias="0.5"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent" /> -->
+
         <fragment
             android:id="@+id/place_autocomplete_fragment_supply"
-            android:name="com.google.android.gms.location.places.ui.PlaceAutocompleteFragment"
+            android:name="com.google.android.gms.location.places.ui.SupportPlaceAutocompleteFragment"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
@@ -26,12 +37,12 @@
             android:id="@+id/textView_fuel_price"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="32dp"
+            android:layout_marginTop="24dp"
             android:text="@string/txt_fuel_price"
             android:visibility="visible"
             app:layout_constraintEnd_toEndOf="@+id/place_autocomplete_fragment_supply"
             app:layout_constraintStart_toStartOf="@+id/place_autocomplete_fragment_supply"
-            app:layout_constraintTop_toBottomOf="@+id/place_autocomplete_fragment_supply" />
+            app:layout_constraintTop_toBottomOf="@+id/button_placePicker_supply" />
 
         <TextView
             android:id="@+id/textView_seats_supply"
@@ -103,6 +114,20 @@
             android:visibility="visible"
             app:layout_constraintBaseline_toBaselineOf="@+id/textView_seats_supply"
             app:layout_constraintEnd_toEndOf="@+id/button_fuel_plus" />
+
+        <Button
+            android:id="@+id/button_placePicker_supply"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:minHeight="0dp"
+            android:minWidth="0dp"
+            android:text="@string/txt_picker_destination"
+            android:textAllCaps="false"
+            android:visibility="visible"
+            app:layout_constraintEnd_toEndOf="@+id/place_autocomplete_fragment_supply"
+            app:layout_constraintStart_toStartOf="@+id/place_autocomplete_fragment_supply"
+            app:layout_constraintTop_toBottomOf="@+id/place_autocomplete_fragment_supply" />
 
     </android.support.constraint.ConstraintLayout>
 </ScrollView>

@@ -81,9 +81,10 @@
     <!-- DialogSettings -->
     <string name="button_plus" translatable="false">+</string>
     <string name="button_minus" translatable="false">-</string>
+    <string name="txt_hint_destination">Enter destination</string>
+    <string name="txt_picker_destination">Or pick on a the map</string>
 
     <!-- DialogSupplySettings -->
-    <string name="txt_hint_destination">Enter destination</string>
     <string name="txt_fuel_price">Fuel price</string>
     <string name="txt_seat_supply">Seats available</string>
     <string name="check_box_pet_supply">Allow pet</string>

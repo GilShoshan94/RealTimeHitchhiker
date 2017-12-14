@@ -1063,11 +1063,11 @@ public class MainActivity extends AppCompatActivity implements SupplyDialogFragm
     //Than return to the callback methods onSupplyDialogPositiveClick or onSupplyDialogNegativeClick
     public void setSupplyDetails(){
         Log.d(TAG, "setSupplyDetails ");
-        android.app.DialogFragment newSupplyFragment = SupplyDialogFragment.newInstance(facebookUserId,latitude,longitude);
-        newSupplyFragment.show(getFragmentManager(), "supplyDialogFragment");
+        DialogFragment newSupplyFragment = SupplyDialogFragment.newInstance(facebookUserId,latitude,longitude);
+        newSupplyFragment.show(getSupportFragmentManager(), "supplyDialogFragment");
     }
     @Override
-    public void onSupplyDialogPositiveClick(android.app.DialogFragment dialog) {
+    public void onSupplyDialogPositiveClick(DialogFragment dialog) {
         flag_supply = true;
         btnSupply.setText(R.string.button_supply_cancel);
         btnResultSupply.setEnabled(true);
@@ -1082,7 +1082,7 @@ public class MainActivity extends AppCompatActivity implements SupplyDialogFragm
     }
 
     @Override
-    public void onSupplyDialogNegativeClick(android.app.DialogFragment dialog) {
+    public void onSupplyDialogNegativeClick(DialogFragment dialog) {
         flag_supply = false;
         btnSupply.setText(R.string.button_supply);
         btnResultSupply.setEnabled(false);

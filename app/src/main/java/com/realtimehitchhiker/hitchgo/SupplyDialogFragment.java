@@ -1,7 +1,6 @@
 package com.realtimehitchhiker.hitchgo;
 
 import android.app.Dialog;
-import android.app.DialogFragment;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
@@ -11,22 +10,28 @@ import android.location.Geocoder;
 import android.os.Bundle;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
+import android.support.v4.app.DialogFragment;
+import android.support.v4.app.FragmentTransaction;
 import android.support.v7.app.AlertDialog;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.EditText;
-import android.widget.LinearLayout;
+import android.widget.FrameLayout;
 import android.widget.TextView;
 
 import com.firebase.geofire.GeoFire;
 import com.firebase.geofire.GeoLocation;
+import com.google.android.gms.common.GooglePlayServicesNotAvailableException;
+import com.google.android.gms.common.GooglePlayServicesRepairableException;
 import com.google.android.gms.common.api.Status;
 import com.google.android.gms.location.places.AutocompleteFilter;
 import com.google.android.gms.location.places.Place;
 import com.google.android.gms.location.places.ui.PlaceAutocompleteFragment;
+import com.google.android.gms.location.places.ui.PlacePicker;
 import com.google.android.gms.location.places.ui.PlaceSelectionListener;
 import com.google.android.gms.location.places.ui.SupportPlaceAutocompleteFragment;
 import com.google.android.gms.maps.model.LatLng;
@@ -47,6 +52,7 @@ import java.util.Objects;
 
 public class SupplyDialogFragment extends DialogFragment implements CounterHandler.CounterListener{
     public static final String TAG = "SUPPLY_DIALOG_FRAGMENT";
+    private static final int PLACE_PICKER_REQUEST = 7496;
 
     private String facebookUserId = null;
     private Double latitude = null;
@@ -64,13 +70,14 @@ public class SupplyDialogFragment extends DialogFragment implements CounterHandl
     private int seats_in_car;
 
     // UI objects in the layer
-    private PlaceAutocompleteFragment autocompleteFragment;
+    private SupportPlaceAutocompleteFragment autocompleteFragment;
     private Place placeDestination;
     private EditText autocompleteEditText;
     private TextView txtFuelPrice;
     private TextView txtSeatsSupply;
     private CheckBox checkBoxPetSupply;
     private Button positiveButton;
+    private Button btnPickOnMap;
     //todo String currency...
     String currency = "NIS";
 
@@ -217,6 +224,8 @@ public class SupplyDialogFragment extends DialogFragment implements CounterHandl
 
         checkBoxPetSupply = dialogView.findViewById(R.id.checkBox_pet_supply);
 
+        btnPickOnMap = dialogView.findViewById(R.id.button_placePicker_supply);
+
         //UI set from sharedPreferences
         final int max_seats = getResources().getInteger(R.integer.pref_supply_max_seats_in_car);
         final int min_seats = 1;
@@ -278,8 +287,13 @@ public class SupplyDialogFragment extends DialogFragment implements CounterHandl
         }
 
         //set the Google widget
-        autocompleteFragment = (PlaceAutocompleteFragment)
-                getFragmentManager().findFragmentById(R.id.place_autocomplete_fragment_supply);
+
+        //autocompleteFragment = new SupportPlaceAutocompleteFragment();
+        //FragmentTransaction transaction = getActivity().getSupportFragmentManager().beginTransaction();
+        //transaction.add(R.id.place_autocomplete_fragment_supply_content, autocompleteFragment ).commit();
+
+        autocompleteFragment = (SupportPlaceAutocompleteFragment)
+                getActivity().getSupportFragmentManager().findFragmentById(R.id.place_autocomplete_fragment_supply);
         Log.i(TAG, "Place: " + autocompleteFragment.toString());
 
         autocompleteEditText = (EditText)autocompleteFragment.getView().findViewById(R.id.place_autocomplete_search_input);
@@ -297,7 +311,6 @@ public class SupplyDialogFragment extends DialogFragment implements CounterHandl
             @Override
             public void onPlaceSelected(Place place) {
                 Log.i(TAG, "Place1: " + place.getName());
-                Log.i(TAG, "Place3: " + place.toString());
                 Log.i(TAG, "Place4 GOOD: " + place.getAddress());
                 Log.i(TAG, "Place5: " + place.getViewport().toString());
                 Log.i(TAG, "Place6: " + place.getLatLng());
@@ -320,6 +333,30 @@ public class SupplyDialogFragment extends DialogFragment implements CounterHandl
                         positiveButton.setEnabled(false);
                     }
                 });
+
+        //set the Place Picker by Google
+        btnPickOnMap.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                PlacePicker.IntentBuilder builder = new PlacePicker.IntentBuilder();
+                try {
+                    Intent intent = builder.build(getActivity());
+                    startActivityForResult(intent, PLACE_PICKER_REQUEST);
+                } catch (GooglePlayServicesRepairableException | GooglePlayServicesNotAvailableException e) {
+                    e.printStackTrace();
+                }
+
+            }
+        });
+    }
+
+    @Override
+    public void onDestroyView() {
+        super.onDestroyView();
+        if (getActivity() != null) {
+            FragmentTransaction transaction = getActivity().getSupportFragmentManager().beginTransaction();
+            transaction.remove(autocompleteFragment).commit();
+        }
     }
 
     @Override
@@ -378,5 +415,21 @@ public class SupplyDialogFragment extends DialogFragment implements CounterHandl
             // Can safely ignore
         }
         return "unknown address";
+    }
+
+    @Override
+    public void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == PLACE_PICKER_REQUEST){
+            if (resultCode == getActivity().RESULT_OK){
+                placeDestination = PlacePicker.getPlace(getActivity(),data);
+                Log.i(TAG, "Place1: " + placeDestination.getName());
+                Log.i(TAG, "Place4 GOOD: " + placeDestination.getAddress());
+                Log.i(TAG, "Place5: " + placeDestination.getViewport().toString());
+                Log.i(TAG, "Place6: " + placeDestination.getLatLng());
+                autocompleteFragment.setText(placeDestination.getAddress());
+                positiveButton.setEnabled(true);
+            }
+        }
     }
 }
