@@ -16,11 +16,9 @@ import android.support.v7.app.AlertDialog;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
-import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.EditText;
-import android.widget.FrameLayout;
 import android.widget.TextView;
 
 import com.firebase.geofire.GeoFire;
@@ -30,7 +28,6 @@ import com.google.android.gms.common.GooglePlayServicesRepairableException;
 import com.google.android.gms.common.api.Status;
 import com.google.android.gms.location.places.AutocompleteFilter;
 import com.google.android.gms.location.places.Place;
-import com.google.android.gms.location.places.ui.PlaceAutocompleteFragment;
 import com.google.android.gms.location.places.ui.PlacePicker;
 import com.google.android.gms.location.places.ui.PlaceSelectionListener;
 import com.google.android.gms.location.places.ui.SupportPlaceAutocompleteFragment;
@@ -199,7 +196,7 @@ public class SupplyDialogFragment extends DialogFragment implements CounterHandl
                 .setNegativeButton(R.string.alert_dialog_cancel, new DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(DialogInterface dialog, int which) {
-                        //allow_pet_supply = checkBoxPetSupply.isChecked();
+                        allow_pet_supply = checkBoxPetSupply.isChecked();
 
                         SharedPreferences.Editor editor = sharedPref.edit();
                         editor.putInt(getString(R.string.pref_supply_seats_in_car), seats_in_car);
@@ -297,7 +294,7 @@ public class SupplyDialogFragment extends DialogFragment implements CounterHandl
         Log.i(TAG, "Place: " + autocompleteFragment.toString());
 
         autocompleteEditText = (EditText)autocompleteFragment.getView().findViewById(R.id.place_autocomplete_search_input);
-        autocompleteEditText.setTextColor(autocompleteEditText.getHintTextColors());//todo check
+        autocompleteEditText.setTextColor(getResources().getColor(R.color.colorWhite));//todo check
         AutocompleteFilter autocompleteFilter = new AutocompleteFilter.Builder()
                 .setTypeFilter(AutocompleteFilter.TYPE_FILTER_NONE)
                 //.setCountry("IL")
