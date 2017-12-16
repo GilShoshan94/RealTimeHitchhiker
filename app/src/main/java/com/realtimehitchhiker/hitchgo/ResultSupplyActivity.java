@@ -42,7 +42,7 @@ import java.util.Set;
 
 public class ResultSupplyActivity extends AppCompatActivity {
     public static final String TAG = "RESULT_SUPPLY_DEBUG";
-    private static final int MY_PERMISSIONS_REQUEST_CALL_PHONE = 198766;
+    private static final int MY_PERMISSIONS_REQUEST_CALL_PHONE = 166;
     public static final String BROADCAST_ACTION_RESULT_SUPPLY_RESUME = "com.realtimehitchhiker.hitchgo.RESULT_SUPPLY_RESUME";
     public static final String BROADCAST_ACTION_RESULT_SUPPLY_PAUSE = "com.realtimehitchhiker.hitchgo.RESULT_SUPPLY_PAUSE";
 
@@ -73,7 +73,7 @@ public class ResultSupplyActivity extends AppCompatActivity {
     private String facebookUserId;
     private String phoneFound = "tel:0000000000";
     private Double myLatitude = 90.0, myLongitude = 0.0; //initialize at pole North
-    private Double DemandLatitude = 90.0, DemandLongitude = 0.0;
+    private Double demandLatitude = 90.0, demandLongitude = 0.0;
 
     private SharedPreferences sharedPref;
     //flag
@@ -308,21 +308,23 @@ public class ResultSupplyActivity extends AppCompatActivity {
     }
 
     public void getDemandLocationFireBase() {
-        Query checkKeyLocation = geoFireDemand.getDatabaseReference().orderByKey().equalTo(resultKey.get(index));
+        Query checkKeyLocation = geoFireDemand.getDatabaseReference().child(resultKey.get(index)).orderByKey().equalTo("l");
         checkKeyLocation.addListenerForSingleValueEvent(new ValueEventListener() {
             @Override
             public void onDataChange(DataSnapshot dataSnapshot) {
-                DemandLatitude = dataSnapshot.child("l").child("0").getValue(Double.class);
-                DemandLongitude = dataSnapshot.child("l").child("1").getValue(Double.class);
+                Log.d(TAG, "Demand index = "+index+" dataSnapshot = "+ dataSnapshot.toString());
+                demandLatitude = dataSnapshot.child("l").child("0").getValue(Double.class);
+                demandLongitude = dataSnapshot.child("l").child("1").getValue(Double.class);
                 //Here we do delete geoFireDemand for the Demand
                 //todo principle question, do we really need to delete in the geoFireDemand?
                 //it could be good to keep this place for real time update of the location of the demand
                 //and it would not hurt the function of the app since the demand itself got already clear
                 //answer : It would be good idea to keep it. but for now we will still delete it and
                 //we won't implement real time location update for the demand to the supply.
-                geoFireDemand.removeLocation(resultKey.get(index));
 
-                Log.d(TAG, "Demand index = "+index+" coordinate = "+DemandLatitude+" "+DemandLongitude);
+                //geoFireDemand.removeLocation(resultKey.get(index)); //we will keep it for now at the end. more easy
+
+                Log.d(TAG, "Demand index = "+index+" coordinate = "+ demandLatitude +" "+ demandLongitude);
             }
 
             @Override
@@ -366,9 +368,9 @@ public class ResultSupplyActivity extends AppCompatActivity {
                     txtShowSupplyDetails.setText(" ");
                 } else {
 
-                    String demandDestination = dataSnapshot.child("demandUsers").child(resultKey.get(index))
+                    String demandDestination = dataSnapshot.child(historyKey).child("demandUsers").child(resultKey.get(index))
                             .child("destination").getValue(String.class);
-                    Integer requestingSeats = dataSnapshot.child("demandUsers").child(resultKey.get(index))
+                    Integer requestingSeats = dataSnapshot.child(historyKey).child("demandUsers").child(resultKey.get(index))
                             .child("requestingSeats").getValue(Integer.class);
                     setInfoDemandDetailsHelper(demandDestination, requestingSeats);
                 }
@@ -399,6 +401,20 @@ public class ResultSupplyActivity extends AppCompatActivity {
                 requestingSeats;
 
         txtShowSupplyDetails.setText(stringBuilder);
+    }
+
+    public void findRiderOnMap (View view) {
+        //Intent intent = new Intent(android.content.Intent.ACTION_VIEW,
+        //       Uri.parse("http://maps.google.com/maps?saddr="+myLatitude+","+myLongitude+"&daddr="
+        //                  +demandLatitude+","+demandLongitude));
+
+        Intent intent = new Intent(android.content.Intent.ACTION_VIEW,
+            Uri.parse("https://www.google.com/maps/dir/?api=1&origin="+
+                    myLatitude+","+myLongitude+
+                    "&destination="+demandLatitude+","+demandLongitude+
+                    "&travelmode=driving"));
+                    //+"&waypoints=Versailles,France%7CChartres,France%7CLe+Mans,France%7CCaen,France"));
+        startActivity(intent);
     }
 
     /**

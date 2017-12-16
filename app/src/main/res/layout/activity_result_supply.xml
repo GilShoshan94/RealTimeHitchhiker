@@ -84,6 +84,7 @@
         android:layout_marginBottom="32dp"
         android:layout_marginEnd="8dp"
         android:layout_marginStart="8dp"
+        android:onClick="findRiderOnMap"
         android:text="@string/button_result_map"
         android:textAllCaps="false"
         app:layout_constraintBottom_toTopOf="@+id/button_supply_call"

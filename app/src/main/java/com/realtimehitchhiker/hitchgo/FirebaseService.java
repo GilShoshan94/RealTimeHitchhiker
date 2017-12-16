@@ -199,7 +199,7 @@ public class FirebaseService extends Service {
             broadcastReceiverLocOff = new BroadcastReceiver() {
                 @Override
                 public void onReceive(Context context, Intent intent) {
-                    if(isAllActiveLocationProvidersDisabled())
+                    if(isAllActiveLocationProvidersDisabled() && !main_activity_is_on && !result_demand_activity_is_on && !result_supply_activity_is_on)
                         buildAndFireNotificationAlertLocationOff();
                 }
             };
@@ -225,6 +225,7 @@ public class FirebaseService extends Service {
                 public void onReceive(Context context, Intent intent) {
                     Log.d(TAG, "broadcastReceiverMain_RESUME");
                     main_activity_is_on = true;
+                    mNotificationManager.cancel(getResources().getInteger(R.integer.notification_location_off_id));
                 }
             };
         }
@@ -764,6 +765,7 @@ public class FirebaseService extends Service {
 
     //For the supply here down
     private boolean result_for_supply_sent_already = false;
+    private Set<String> oldSet = new HashSet<>(); // to detect a change
     private ValueEventListener valueEventListenerForSupplyRequest = new ValueEventListener() {
         @Override
         public void onDataChange(DataSnapshot dataSnapshot) {
@@ -772,15 +774,26 @@ public class FirebaseService extends Service {
             } else {
                 Set<String> set = new HashSet<>();
                 set.clear();
-                for (DataSnapshot demandIdSnapshot : dataSnapshot.child("demandUsers").getChildren()) {
+                String historyKey = sharedPref.getString(getString(R.string.pref_historyKey), "-n-u-l-l-");
+                Log.d(TAG, "AAdemandIdSnapshot" + dataSnapshot.child(historyKey).child("demandUsers").toString());
+
+                for (DataSnapshot demandIdSnapshot : dataSnapshot.child(historyKey).child("demandUsers").getChildren()) {
                     String demandId = demandIdSnapshot.getKey();
                     Log.d(TAG, "valueEventListenerForSupplyRequest : onDataChange : demandId = "+demandId);
                     set.add(demandId);
                 }
-                SharedPreferences.Editor edit=sharedPref.edit();
-                edit.putStringSet(getString(R.string.pref_resultKey_forSupply), set);
-                edit.apply();
-                postProcessResultForSupplyRequest();
+                if(set.size() == 0)
+                    return;
+
+                if(!set.equals(oldSet)){
+                    oldSet.clear();
+                    oldSet.addAll(set);
+
+                    SharedPreferences.Editor edit=sharedPref.edit();
+                    edit.putStringSet(getString(R.string.pref_resultKey_forSupply), set);
+                    edit.apply();
+                    postProcessResultForSupplyRequest();
+                }
             }
         }
         @Override
@@ -792,6 +805,7 @@ public class FirebaseService extends Service {
         if (supply_true_or_cancel_false){
             Log.d(TAG, "mainSupplyRequest true");
             result_for_supply_sent_already = false;
+            oldSet.clear();
             listenNewDemandQuery.addValueEventListener(valueEventListenerForSupplyRequest);
         }
         else {

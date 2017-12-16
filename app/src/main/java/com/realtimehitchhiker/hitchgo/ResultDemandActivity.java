@@ -47,7 +47,7 @@ import java.util.Set;
 
 public class ResultDemandActivity extends AppCompatActivity {
     public static final String TAG = "RESULT_DEMAND_DEBUG";
-    private static final int MY_PERMISSIONS_REQUEST_CALL_PHONE =198765;
+    private static final int MY_PERMISSIONS_REQUEST_CALL_PHONE =165;
     public static final String BROADCAST_ACTION_RESULT_DEMAND_RESUME = "com.realtimehitchhiker.hitchgo.RESULT_DEMAND_RESUME";
     public static final String BROADCAST_ACTION_RESULT_DEMAND_PAUSE = "com.realtimehitchhiker.hitchgo.RESULT_DEMAND_PAUSE";
 
@@ -250,11 +250,12 @@ public class ResultDemandActivity extends AppCompatActivity {
         //If we booked already than, we can just see our supply and we cannot rebook
         //Or if there is no key found
         if(flag_demand_booked || resultKey.size()==0){
-            btnBook.setEnabled(false);
             btnNext.setEnabled(false);
             btnPrev.setEnabled(false);
-            btnCall.setEnabled(false);
+            btnBook.setEnabled(false);
+            btnCall.setEnabled(true);
             if(resultKey.size()==0) {
+                btnCall.setEnabled(false);
                 imProfile.setBackgroundResource(R.drawable.com_facebook_profile_picture_blank_square);
                 txtShowSupplyProfile.setText("");
                 txtShowSupplyDetails.setText("");

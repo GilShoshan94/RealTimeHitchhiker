@@ -202,6 +202,8 @@ public class MainActivity extends AppCompatActivity implements SupplyDialogFragm
         demand_seats = sharedPref.getInt(getString(R.string.pref_demand_seats_in_car), 1);
         flag_supply = sharedPref.getBoolean(getString(R.string.pref_supply_status), false);
         flag_demand = sharedPref.getBoolean(getString(R.string.pref_demand_status), false);
+        flag_supply_booked = sharedPref.getBoolean(getString(R.string.pref_supply_booked_status), false);
+        flag_demand_booked = sharedPref.getBoolean(getString(R.string.pref_demand_booked_status), false);
         phone_number = sharedPref.getString(getString(R.string.pref_phone_number), "false");
         historyKey = sharedPref.getString(getString(R.string.pref_historyKey), "-n-u-l-l-");
         Log.d(TAG, "getSharedPreferences : radius = " + radius );
@@ -1090,10 +1092,10 @@ public class MainActivity extends AppCompatActivity implements SupplyDialogFragm
                 editor.putBoolean(getString(R.string.pref_demand_status), flag_demand);
                 editor.apply();
                 initializeDemandButton();
-                if(flag_demand && flagToBroadcastRequestOneTime){
+                /*if(flag_demand && flagToBroadcastRequestOneTime){ PROBLEM doesn't work as intended... launch more then one time
                     flagToBroadcastRequestOneTime = false;
                     broadcastRequest(true);
-                }
+                }*///todo
             }
 
             @Override
@@ -1113,10 +1115,10 @@ public class MainActivity extends AppCompatActivity implements SupplyDialogFragm
                 editor.putBoolean(getString(R.string.pref_supply_status), flag_supply);
                 editor.apply();
                 initializeSupplyButton();
-                if(flag_supply && flagToBroadcastSupplyOneTime){
+                /*if(flag_supply && flagToBroadcastSupplyOneTime){ PROBLEM doesn't work as intended... launch more then one time
                     flagToBroadcastSupplyOneTime = false;
                     broadcastSupplyRequest(true);
-                }
+                }*///todo
             }
 
             @Override
@@ -1155,7 +1157,7 @@ public class MainActivity extends AppCompatActivity implements SupplyDialogFragm
     }
     @Override
     public void onSupplyDialogPositiveClick(DialogFragment dialog) {
-        //reset the found keys
+        //reset the found keys and the flag flag_supply_booked
         Set<String> set = new HashSet<>();
         set.clear();
         SharedPreferences.Editor edit=sharedPref.edit();
@@ -1165,11 +1167,13 @@ public class MainActivity extends AppCompatActivity implements SupplyDialogFragm
         broadcastSupplyRequest(true);
 
         flag_supply = true;
+        flag_supply_booked = false;
         btnSupply.setText(R.string.button_supply_cancel);
         btnResultSupply.setEnabled(true);
 
         SharedPreferences.Editor editor = sharedPref.edit();
         editor.putBoolean(getString(R.string.pref_supply_status), flag_supply);
+        editor.putBoolean(getString(R.string.pref_supply_booked_status), flag_supply_booked);
         editor.apply();
 
         //disable the Demand button (cannot demand and supply in simultaneously)
@@ -1273,11 +1277,13 @@ public class MainActivity extends AppCompatActivity implements SupplyDialogFragm
         broadcastRequest(true);
 
         flag_demand = true;
+        flag_demand_booked = false;
         btnDemand.setText(R.string.button_demand_cancel);
         btnResultDemand.setEnabled(true);
 
         SharedPreferences.Editor editor = sharedPref.edit();
         editor.putBoolean(getString(R.string.pref_demand_status), flag_demand);
+        editor.putBoolean(getString(R.string.pref_demand_booked_status), flag_demand_booked);
         editor.apply();
 
         //disable the Supply button (cannot demand and supply in simultaneously)
