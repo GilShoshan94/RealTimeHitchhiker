@@ -14,5 +14,7 @@
     <integer name="location_max_time">60000</integer> <!-- The maximum time between updates for the location, in milliseconds (120000 == 2 minutes) -->
 
     <!-- Notification ID -->
-    <integer name="notification_id">1</integer>
+    <integer name="notification_supply_found_id">1</integer>
+    <integer name="notification_demand_found_id">2</integer>
+    <integer name="notification_location_off_id">3</integer>
 </resources>

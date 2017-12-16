@@ -13,6 +13,7 @@ import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.location.Location;
+import android.location.LocationManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.IBinder;
@@ -25,8 +26,10 @@ import com.firebase.geofire.GeoFire;
 import com.firebase.geofire.GeoLocation;
 import com.firebase.geofire.GeoQuery;
 import com.firebase.geofire.GeoQueryEventListener;
+import com.google.firebase.auth.FacebookAuthProvider;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
+import com.google.firebase.auth.UserInfo;
 import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
@@ -35,6 +38,8 @@ import com.google.firebase.database.Query;
 import com.google.firebase.database.ValueEventListener;
 
 import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.Set;
 
 
 /**
@@ -47,7 +52,9 @@ import java.util.ArrayList;
 
 public class FirebaseService extends Service {
     public static final String BROADCAST_ACTION_SUPPLY_FOUND = "com.realtimehitchhiker.hitchgo.SUPPLY_FOUND";
-    public static final String BROADCAST_ACTION_SUPPLY_LOST = "com.realtimehitchhiker.hitchgo.SUPPLY_LOST";
+    public static final String BROADCAST_ACTION_SUPPLY_UPDATE = "com.realtimehitchhiker.hitchgo.SUPPLY_UPDATE";
+    public static final String BROADCAST_ACTION_DEMAND_FOUND = "com.realtimehitchhiker.hitchgo.DEMAND_FOUND";
+    public static final String BROADCAST_ACTION_DEMAND_UPDATE = "com.realtimehitchhiker.hitchgo.DEMAND_UPDATE";
     public static final String TAG = "FIREBASE_SERVICE_DEBUG";
 
     private NotificationManager mNotificationManager;
@@ -55,16 +62,21 @@ public class FirebaseService extends Service {
     private NotificationCompat.Builder notificationBuilder;
 
     private FirebaseUser currentUser;
+    private String facebookUserId = "";
     private DatabaseReference refUsers;
     private DatabaseReference refSupply;
     private DatabaseReference refDemand;
+    private DatabaseReference refHistory;
     private GeoFire geoFireSupply, geoFireDemand;
     private GeoQuery geoQuery = null;
     private MyGlobalHistory globalHistory;
+    private Query listenNewDemandQuery = null;
 
     private LocalBroadcastManager localBroadcastManager;
     private BroadcastReceiver broadcastReceiverLocUpdate, broadcastReceiverLocOff, broadcastReceiverRadiusUpdate;
     private BroadcastReceiver broadcastReceiverMainResume, broadcastReceiverMainPause, broadcastReceiverMainRequest;
+    private BroadcastReceiver broadcastReceiverResultDemandResume, broadcastReceiverResultDemandPause,
+            broadcastReceiverResultSupplyResume, broadcastReceiverResultSupplyPause, broadcastReceiverMainSupplyRequest;
     private BroadcastReceiver broadcastReceiverDemandDetails;
     private Double latitude = 90.0, longitude = 0.0; //initialize at pole North
     private SharedPreferences sharedPref;
@@ -77,7 +89,10 @@ public class FirebaseService extends Service {
 
     //Flag
     private boolean main_activity_is_on = true;
+    private boolean result_demand_activity_is_on = false;
+    private boolean result_supply_activity_is_on = false;
     private boolean demand_true_or_cancel_false;
+    private boolean supply_true_or_cancel_false;
     private boolean on_process = false;
     private boolean initialization_flag = true;
     private boolean result_sent_already = false;
@@ -132,12 +147,19 @@ public class FirebaseService extends Service {
         //For FireBase
         FirebaseAuth mAuth = FirebaseAuth.getInstance();
         currentUser = mAuth.getCurrentUser();
+        // find the Facebook profile and get the user's id
+        for(UserInfo profile : currentUser.getProviderData()) {
+            // check if the provider id matches "facebook.com"
+            if(FacebookAuthProvider.PROVIDER_ID.equals(profile.getProviderId())) {
+                facebookUserId = profile.getUid();
+            }
+        }
         FirebaseDatabase database = FirebaseDatabase.getInstance();
         DatabaseReference myDataBaseRef = database.getReference();
         refUsers = myDataBaseRef.child("users/");
         refSupply = myDataBaseRef.child("supply/");
         refDemand = myDataBaseRef.child("demand/");
-        DatabaseReference refHistory = myDataBaseRef.child("history/");
+        refHistory = myDataBaseRef.child("history/");
         geoFireSupply = new GeoFire(myDataBaseRef.child("geofire/geofire-supply"));
         geoFireDemand = new GeoFire(myDataBaseRef.child("geofire/geofire-demand"));
         globalHistory = new MyGlobalHistory(refHistory);
@@ -148,8 +170,14 @@ public class FirebaseService extends Service {
         int defaultValue = getResources().getInteger(R.integer.pref_radius_min);
         radius = sharedPref.getInt(getString(R.string.pref_radius), defaultValue);
         demand_true_or_cancel_false = sharedPref.getBoolean(getString(R.string.pref_main_request_boolean), false);
+        supply_true_or_cancel_false = sharedPref.getBoolean(getString(R.string.pref_main_supply_request_boolean), false);
         demand_pet = sharedPref.getBoolean(getString(R.string.pref_demand_pet), false);
         demand_seats = sharedPref.getInt(getString(R.string.pref_supply_seats_in_car), 1);
+        Set<String> setResultKey = sharedPref.getStringSet(getString(R.string.pref_resultKey_forDemand), null);
+        if(setResultKey != null) {
+            resultKeySent.clear();
+            resultKeySent.addAll(setResultKey);
+        }
     }
 
     @Override
@@ -171,7 +199,11 @@ public class FirebaseService extends Service {
                             if (geoQuery!=null){
                                 initialization_flag = true;
                                 geoQuery.setCenter(new GeoLocation(latitude,longitude));
+                                geoFireDemand.setLocation(facebookUserId, new GeoLocation(latitude, longitude));
                             }
+                        }
+                        else if (supply_true_or_cancel_false){
+                            geoFireSupply.setLocation(facebookUserId, new GeoLocation(latitude, longitude));
                         }
                     }
                 }
@@ -181,7 +213,8 @@ public class FirebaseService extends Service {
             broadcastReceiverLocOff = new BroadcastReceiver() {
                 @Override
                 public void onReceive(Context context, Intent intent) {
-                    //todo for future improvements could fire a notification asking to enable location again if not in app
+                    if(isAllActiveLocationProvidersDisabled() && !main_activity_is_on && !result_demand_activity_is_on && !result_supply_activity_is_on)
+                        buildAndFireNotificationAlertLocationOff();
                 }
             };
         }
@@ -206,6 +239,7 @@ public class FirebaseService extends Service {
                 public void onReceive(Context context, Intent intent) {
                     Log.d(TAG, "broadcastReceiverMain_RESUME");
                     main_activity_is_on = true;
+                    mNotificationManager.cancel(getResources().getInteger(R.integer.notification_location_off_id));
                 }
             };
         }
@@ -215,6 +249,44 @@ public class FirebaseService extends Service {
                 public void onReceive(Context context, Intent intent) {
                     Log.d(TAG, "broadcastReceiverMain_PAUSE");
                     main_activity_is_on = false;
+                }
+            };
+        }
+        if(broadcastReceiverResultDemandResume == null){
+            broadcastReceiverResultDemandResume = new BroadcastReceiver() {
+                @Override
+                public void onReceive(Context context, Intent intent) {
+                    Log.d(TAG, "broadcastReceiverMain_RESUME");
+                    result_demand_activity_is_on = true;
+                    mNotificationManager.cancel(getResources().getInteger(R.integer.notification_supply_found_id));
+                }
+            };
+        }
+        if(broadcastReceiverResultDemandPause == null){
+            broadcastReceiverResultDemandPause = new BroadcastReceiver() {
+                @Override
+                public void onReceive(Context context, Intent intent) {
+                    Log.d(TAG, "broadcastReceiverMain_PAUSE");
+                    result_demand_activity_is_on = false;
+                }
+            };
+        }
+        if(broadcastReceiverResultSupplyResume == null){
+            broadcastReceiverResultSupplyResume = new BroadcastReceiver() {
+                @Override
+                public void onReceive(Context context, Intent intent) {
+                    Log.d(TAG, "broadcastReceiverMain_RESUME");
+                    result_supply_activity_is_on = true;
+                    mNotificationManager.cancel(getResources().getInteger(R.integer.notification_demand_found_id));
+                }
+            };
+        }
+        if(broadcastReceiverResultSupplyPause == null){
+            broadcastReceiverResultSupplyPause = new BroadcastReceiver() {
+                @Override
+                public void onReceive(Context context, Intent intent) {
+                    Log.d(TAG, "broadcastReceiverMain_PAUSE");
+                    result_supply_activity_is_on = false;
                 }
             };
         }
@@ -243,6 +315,21 @@ public class FirebaseService extends Service {
                 }
             };
         }
+        if(broadcastReceiverMainSupplyRequest == null){
+            broadcastReceiverMainSupplyRequest = new BroadcastReceiver() {
+                @Override
+                public void onReceive(Context context, Intent intent) {
+                    supply_true_or_cancel_false = (boolean)intent.getExtras().get("supply_true_or_cancel_false");
+                    Log.d(TAG, "broadcastReceiverMain_SUPPLY_REQUEST bool : " + supply_true_or_cancel_false);
+                    SharedPreferences.Editor editor = sharedPref.edit();
+                    editor.putBoolean(getString(R.string.pref_main_supply_request_boolean), supply_true_or_cancel_false);
+                    editor.apply();
+                    String historyKey = sharedPref.getString(getString(R.string.pref_historyKey), "-n-u-l-l-");
+                    listenNewDemandQuery = refHistory.orderByKey().equalTo(historyKey);
+                    mainSupplyRequest();
+                }
+            };
+        }
 
         if(localBroadcastManager == null) {
             localBroadcastManager = LocalBroadcastManager.getInstance(this);
@@ -251,8 +338,13 @@ public class FirebaseService extends Service {
             localBroadcastManager.registerReceiver(broadcastReceiverRadiusUpdate, new IntentFilter(SettingsActivity.BROADCAST_ACTION_RADIUS_UPDATE));
             localBroadcastManager.registerReceiver(broadcastReceiverMainResume, new IntentFilter(MainActivity.BROADCAST_ACTION_MAIN_RESUME));
             localBroadcastManager.registerReceiver(broadcastReceiverMainPause, new IntentFilter(MainActivity.BROADCAST_ACTION_MAIN_PAUSE));
+            localBroadcastManager.registerReceiver(broadcastReceiverResultDemandResume, new IntentFilter(ResultDemandActivity.BROADCAST_ACTION_RESULT_DEMAND_RESUME));
+            localBroadcastManager.registerReceiver(broadcastReceiverResultDemandPause, new IntentFilter(ResultDemandActivity.BROADCAST_ACTION_RESULT_DEMAND_PAUSE));
+            localBroadcastManager.registerReceiver(broadcastReceiverResultSupplyResume, new IntentFilter(ResultSupplyActivity.BROADCAST_ACTION_RESULT_SUPPLY_RESUME));
+            localBroadcastManager.registerReceiver(broadcastReceiverResultSupplyPause, new IntentFilter(ResultSupplyActivity.BROADCAST_ACTION_RESULT_SUPPLY_PAUSE));
             localBroadcastManager.registerReceiver(broadcastReceiverMainRequest, new IntentFilter(MainActivity.BROADCAST_ACTION_MAIN_REQUEST));
             localBroadcastManager.registerReceiver(broadcastReceiverDemandDetails, new IntentFilter(DemandDialogFragment.BROADCAST_ACTION_DEMAND_DIALOG_FRAGMENT_REQUEST));
+            localBroadcastManager.registerReceiver(broadcastReceiverMainSupplyRequest, new IntentFilter(MainActivity.BROADCAST_ACTION_MAIN_SUPPLY_REQUEST));
         }
 
         return START_STICKY;
@@ -289,6 +381,18 @@ public class FirebaseService extends Service {
         if(broadcastReceiverMainPause != null){
             localBroadcastManager.unregisterReceiver(broadcastReceiverMainPause);
         }
+        if(broadcastReceiverResultDemandResume != null){
+            localBroadcastManager.unregisterReceiver(broadcastReceiverResultDemandResume);
+        }
+        if(broadcastReceiverResultDemandPause != null){
+            localBroadcastManager.unregisterReceiver(broadcastReceiverResultDemandPause);
+        }
+        if(broadcastReceiverResultSupplyResume != null){
+            localBroadcastManager.unregisterReceiver(broadcastReceiverResultSupplyResume);
+        }
+        if(broadcastReceiverResultSupplyPause != null){
+            localBroadcastManager.unregisterReceiver(broadcastReceiverResultSupplyPause);
+        }
         if(broadcastReceiverMainRequest != null){
             localBroadcastManager.unregisterReceiver(broadcastReceiverMainRequest);
         }
@@ -297,6 +401,9 @@ public class FirebaseService extends Service {
         }
         if(broadcastReceiverDemandDetails != null){
             localBroadcastManager.unregisterReceiver(broadcastReceiverDemandDetails);
+        }
+        if(broadcastReceiverMainSupplyRequest != null){
+            localBroadcastManager.unregisterReceiver(broadcastReceiverMainSupplyRequest);
         }
 
         Intent i_stop = new Intent(getApplicationContext(), LocationService.class);
@@ -307,9 +414,9 @@ public class FirebaseService extends Service {
         Log.d(TAG, "buildAndFire_NOTIFICATION");
         notificationBuilder = new NotificationCompat.Builder(this, channel_id);
         notificationBuilder.setSmallIcon(R.mipmap.ic_launcher)
-                .setContentTitle(getString(R.string.notification_title))
-                .setContentText(getString(R.string.notification_text))
-                .setTicker(getString(R.string.notification_title))
+                .setContentTitle(getString(R.string.notification_supply_found_title))
+                .setContentText(getString(R.string.notification_supply_found_text))
+                .setTicker(getString(R.string.notification_supply_found_title))
                 .setPriority(Notification.PRIORITY_HIGH) //or Notification.PRIORITY_MAX maybe ?
                 .setAutoCancel(true)
                 .setDefaults(Notification.DEFAULT_VIBRATE)
@@ -322,22 +429,25 @@ public class FirebaseService extends Service {
             Supply a PendingIntent to send when the notification is cleared by the user directly from the notification panel. For example, this intent is sent when the user clicks the "Clear all" button, or the individual "X" buttons on notifications. This intent is not sent when the application calls NotificationManager.cancel(int).
             */
         // Creates an explicit intent for an Activity in your app
-        Intent resultIntent = new Intent(this, ResultActivity.class);
-
-        Bundle bundle = new Bundle();
-        bundle.putStringArrayList("facebookUserIdFound", new ArrayList<>(resultKey));
-        bundle.putDouble("latitude",latitude);
-        bundle.putDouble("longitude",longitude);
-
-        resultIntent.putExtras(bundle);
-
+        Intent parentIntent = new Intent(this, MainActivity.class);
         // The stack builder object will contain an artificial back stack for the
         // started Activity.
         // This ensures that navigating backward from the Activity leads out of
         // your app to the Home screen.
         TaskStackBuilder stackBuilder = TaskStackBuilder.create(this);
         // Adds the back stack for the Intent (but not the Intent itself)
-        stackBuilder.addParentStack(ResultActivity.class);
+        stackBuilder.addParentStack(MainActivity.class);
+        // Adds the Intent that starts the Activity to the top of the stack
+        stackBuilder.addNextIntent(parentIntent);
+
+        Intent resultIntent = new Intent(this, ResultDemandActivity.class);
+
+        Bundle bundle = new Bundle();
+        bundle.putDouble("latitude",latitude);
+        bundle.putDouble("longitude",longitude);
+
+        resultIntent.putExtras(bundle);
+
         // Adds the Intent that starts the Activity to the top of the stack
         stackBuilder.addNextIntent(resultIntent);
         PendingIntent resultPendingIntent =
@@ -350,7 +460,7 @@ public class FirebaseService extends Service {
         // mNotificationId is a unique integer your app uses to identify the
         // notification. For example, to cancel the notification, you can pass its ID
         // number to NotificationManager.cancel().
-        mNotificationManager.notify(getResources().getInteger(R.integer.notification_id), notificationBuilder.build());
+        mNotificationManager.notify(getResources().getInteger(R.integer.notification_supply_found_id), notificationBuilder.build());
     }
 
     private void mainRequest() {
@@ -376,11 +486,12 @@ public class FirebaseService extends Service {
             resultLocationTempBuffer.clear();
             result_sent_already = false;
             resultKeySent.clear();
-            mNotificationManager.cancel(getResources().getInteger(R.integer.notification_id));
+            mNotificationManager.cancel(getResources().getInteger(R.integer.notification_supply_found_id));
+            mNotificationManager.cancel(getResources().getInteger(R.integer.notification_location_off_id));
         }
     }
 
-    public void findRideFromFireBase(){
+    private void findRideFromFireBase(){
         Log.d(TAG, "FIND :  with radius = " + radius + "\nFIND : latitude, longitude" + latitude.toString() + ", " + longitude.toString());
         // Read from the database
         // creates a new query around [latitude, longitude] with a radius of "radius" kilometers
@@ -390,11 +501,13 @@ public class FirebaseService extends Service {
             public void onKeyEntered(String key, GeoLocation location) {
                 Log.d(TAG, "FIND : "+String.format("Key %s entered the search area at [%f,%f]", key, location.latitude, location.longitude));
                 if(initialization_flag && resultKey.size() < getResources().getInteger(R.integer.pref_max_supply_found) ) {
+                    Log.d(TAG, "FIND : case 1");
                     resultKey.add(key);
                     resultLocation.add(new ResultLocation(location));
                 }
 
                 else if(initialization_flag && resultKey.size() >= getResources().getInteger(R.integer.pref_max_supply_found) && !on_process){
+                    Log.d(TAG, "FIND : case 2");
                     resultKeyTempBuffer.add(key);
                     resultLocationTempBuffer.add(new ResultLocation(location));
                     on_process = true;
@@ -402,12 +515,14 @@ public class FirebaseService extends Service {
                     processResult();
                 }
                 else if (!initialization_flag && !on_process){
+                    Log.d(TAG, "FIND : case 3");
                     resultKey.add(key);
                     resultLocation.add(new ResultLocation(location));
                     on_process = true;
                     processResult();
                 }
                 else if (!initialization_flag && on_process && resultKeyTempBuffer.size() < getResources().getInteger(R.integer.pref_max_supply_found_buffer)){
+                    Log.d(TAG, "FIND : case 4");
                     //add temporary buffer if on process with size limit for performance
                     resultKeyTempBuffer.add(key);
                     resultLocationTempBuffer.add(new ResultLocation(location));
@@ -418,9 +533,8 @@ public class FirebaseService extends Service {
             public void onKeyExited(String key) {
                 Log.d(TAG, "FIND : "+String.format("Key %s is no longer in the search area", key));
                 int index = resultKey.indexOf(key);
-                int indexBuffer = resultKeyTempBuffer.indexOf(key);
 
-                if(index !=-1) { //todo race with process() problem ??
+                if(index !=-1) { //todo check if race with process() problem ??
                     resultKey.remove(index);
                     resultLocation.remove(index);
                     if(!resultKeyTempBuffer.isEmpty()){
@@ -429,25 +543,26 @@ public class FirebaseService extends Service {
                     }
                 }
 
+                int indexBuffer = resultKeyTempBuffer.indexOf(key);
                 if(indexBuffer !=-1) {
-                    resultKeyTempBuffer.remove(index);
-                    resultLocationTempBuffer.remove(index);
+                    resultKeyTempBuffer.remove(indexBuffer);
+                    resultLocationTempBuffer.remove(indexBuffer);
                 }
 
                 int indexSent = resultKeySent.indexOf(key);
-                if (indexSent != 1) {
-                    broadcastResultLost(key); //update notification? / result activity
-                    resultKeySent.remove(index);
+                if (indexSent !=-1) {
+                    resultKeySent.remove(indexSent);
                     if(resultKeySent.isEmpty()){
                         if(!result_sent_already) {
-                            mNotificationManager.cancel(getResources().getInteger(R.integer.notification_id));
+                            mNotificationManager.cancel(getResources().getInteger(R.integer.notification_supply_found_id));
                         }
                     }
-                    //todo
-                    /*else {
-                        if ResultActivity is not on already, then update the notification...
-                    }
-                     */
+                    Set<String> set = new HashSet<>();
+                    set.addAll(resultKeySent);
+                    SharedPreferences.Editor edit=sharedPref.edit();
+                    edit.putStringSet(getString(R.string.pref_resultKey_forDemand), set);
+                    edit.apply();
+                    broadcastResultUpdate(); //update notification / result activity
                 }
 
             }
@@ -493,6 +608,7 @@ public class FirebaseService extends Service {
         // ... check data... remove if not enough seats...
         ArrayList<String> oldKey = new ArrayList<>(resultKey); // to detect a change
         querySent = 0;
+        queryFinished = 0;
         forLoopFinished = false;
 
         for (int i = 0; i <= getResources().getInteger(R.integer.pref_max_supply_found); i++) {
@@ -555,21 +671,38 @@ public class FirebaseService extends Service {
 
     private void postProcessResult(){
         Log.d(TAG, "postProcessResult : (queryFinished == querySent) ? " + (queryFinished == querySent));
+        querySent = 0;
+        queryFinished = 0;
+        forLoopFinished = false;
 
         if(resultKey.isEmpty()){
             on_process = false;
-            querySent = 0;
-            queryFinished = 0;
-            forLoopFinished = false;
             return;
         }
 
         if(!result_sent_already) {
-            if (main_activity_is_on) {
+
+            //Add resultKey to resultKeySent to be able to remember what we sent and save it
+            resultKeySent.addAll(resultKey);
+            Set<String> set = new HashSet<>();
+            set.addAll(resultKey);
+            SharedPreferences.Editor edit=sharedPref.edit();
+            edit.putStringSet(getString(R.string.pref_resultKey_forDemand), set);
+            edit.apply();
+
+            //clearing the lists we just sent to result to not sent it again
+            resultKey.clear();
+            resultLocation.clear();
+
+            if (main_activity_is_on && !result_demand_activity_is_on && !result_supply_activity_is_on) {
                 Log.d(TAG, "processResult main activity ON");
 
                 broadcastResult();
-            } else {
+            }
+            else if(result_demand_activity_is_on){
+                broadcastResultUpdate();
+            }
+            else {
                 Log.d(TAG, "processResult main activity OFF");
 
                 buildAndFireNotification();
@@ -577,17 +710,28 @@ public class FirebaseService extends Service {
 
             result_sent_already = true;
 
-            //Add resultKey to resultKeySent to be able to remember what we sent
-            resultKeySent.addAll(resultKey);
-
-            //clearing the lists we just sent to result to not sent it again
-            resultKey.clear();
-            resultLocation.clear();
             on_process = false;
         }
         else {
-            // todo update notification / result activity that there is more supply found
-            // For now stay with the on_process flag set to true to freeze the resultKey/Location lists. (but the buffer are still loading)
+            // update notification / result activity that there is more supply found
+            //Add resultKey to resultKeySent to be able to remember what we sent and save it
+            resultKeySent.addAll(resultKey);
+            Set<String> set = new HashSet<>();
+            set.addAll(resultKey);
+            SharedPreferences.Editor edit=sharedPref.edit();
+            edit.putStringSet(getString(R.string.pref_resultKey_forDemand), set);
+            edit.apply();
+
+            if (main_activity_is_on && !result_demand_activity_is_on && !result_supply_activity_is_on) {
+                Log.d(TAG, "processResult main activity ON");
+
+                broadcastResult();
+            }
+            else if(result_demand_activity_is_on){
+                broadcastResultUpdate();
+            }
+
+            on_process = false;
         }
     }
 
@@ -596,7 +740,6 @@ public class FirebaseService extends Service {
         Intent intent = new Intent(BROADCAST_ACTION_SUPPLY_FOUND);
 
         Bundle bundle = new Bundle();
-        bundle.putStringArrayList("facebookUserIdFound", new ArrayList<>(resultKey));
         bundle.putDouble("latitude",latitude);
         bundle.putDouble("longitude",longitude);
 
@@ -605,10 +748,9 @@ public class FirebaseService extends Service {
         localBroadcastManager.sendBroadcast(intent);
     }
 
-    private void broadcastResultLost(String key){ //todo update notification? / result activity that we lost a supply
+    private void broadcastResultUpdate(){
         LocalBroadcastManager localBroadcastManager = LocalBroadcastManager.getInstance(this);
-        Intent intent = new Intent(BROADCAST_ACTION_SUPPLY_LOST);
-        intent.putExtra("facebookUserIdLost", key);
+        Intent intent = new Intent(BROADCAST_ACTION_SUPPLY_UPDATE);
         localBroadcastManager.sendBroadcast(intent);
     }
 
@@ -638,6 +780,193 @@ public class FirebaseService extends Service {
         }
     }
 
+
+    //For the supply here down
+    private boolean result_for_supply_sent_already = false;
+    private Set<String> oldSet = new HashSet<>(); // to detect a change
+    private ValueEventListener valueEventListenerForSupplyRequest = new ValueEventListener() {
+        @Override
+        public void onDataChange(DataSnapshot dataSnapshot) {
+            if (!dataSnapshot.exists()) {
+                Log.e(TAG, "user not found in the database NOT NORMAL");
+            } else {
+                Set<String> set = new HashSet<>();
+                set.clear();
+                String historyKey = sharedPref.getString(getString(R.string.pref_historyKey), "-n-u-l-l-");
+                Log.d(TAG, "AAdemandIdSnapshot" + dataSnapshot.child(historyKey).child("demandUsers").toString());
+
+                for (DataSnapshot demandIdSnapshot : dataSnapshot.child(historyKey).child("demandUsers").getChildren()) {
+                    String demandId = demandIdSnapshot.getKey();
+                    Log.d(TAG, "valueEventListenerForSupplyRequest : onDataChange : demandId = "+demandId);
+                    set.add(demandId);
+                }
+                if(set.size() == 0)
+                    return;
+
+                if(!set.equals(oldSet)){
+                    oldSet.clear();
+                    oldSet.addAll(set);
+
+                    SharedPreferences.Editor edit=sharedPref.edit();
+                    edit.putStringSet(getString(R.string.pref_resultKey_forSupply), set);
+                    edit.apply();
+                    postProcessResultForSupplyRequest();
+                }
+            }
+        }
+        @Override
+        public void onCancelled(DatabaseError databaseError) {
+            Log.w(TAG, "DATABASE Failed to read value. in valueEventListenerForSupplyRequest", databaseError.toException());
+        }
+    };
+    private void mainSupplyRequest() {
+        if (supply_true_or_cancel_false){
+            Log.d(TAG, "mainSupplyRequest true");
+            result_for_supply_sent_already = false;
+            oldSet.clear();
+            listenNewDemandQuery.addValueEventListener(valueEventListenerForSupplyRequest);
+        }
+        else {
+            Log.d(TAG, "mainSupplyRequest false");
+            if(listenNewDemandQuery!=null) {
+                listenNewDemandQuery.removeEventListener(valueEventListenerForSupplyRequest);
+            }
+            result_for_supply_sent_already = false;
+            mNotificationManager.cancel(getResources().getInteger(R.integer.notification_demand_found_id));
+            mNotificationManager.cancel(getResources().getInteger(R.integer.notification_location_off_id));
+        }
+    }
+
+    private void postProcessResultForSupplyRequest() {
+        SharedPreferences.Editor editor = sharedPref.edit();
+        editor.putBoolean(getString(R.string.pref_supply_booked_status), true);
+        editor.apply();
+        if (main_activity_is_on && !result_demand_activity_is_on && !result_supply_activity_is_on) {
+            Log.d(TAG, "postProcessResultForSupplyRequest main activity ON");
+
+            broadcastSupplyResult();
+        }
+        else if(result_supply_activity_is_on){
+            broadcastSupplyResultUpdate();
+        }
+        else { //else if (result_for_supply_sent_already) //todo pick one
+            Log.d(TAG, "postProcessResultForSupplyRequest main activity OFF");
+
+            buildAndFireNotificationForSupply();
+        }
+        result_for_supply_sent_already = true;
+    }
+
+    private void buildAndFireNotificationForSupply() {
+        Log.d(TAG, "buildAndFire_NOTIFICATION");
+        notificationBuilder = new NotificationCompat.Builder(this, channel_id);
+        notificationBuilder.setSmallIcon(R.mipmap.ic_launcher)
+                .setContentTitle(getString(R.string.notification_demand_found_title))
+                .setContentText(getString(R.string.notification_demand_found_text))
+                .setTicker(getString(R.string.notification_demand_found_title))
+                .setPriority(Notification.PRIORITY_HIGH) //or Notification.PRIORITY_MAX maybe ?
+                .setAutoCancel(true)
+                .setDefaults(Notification.DEFAULT_VIBRATE)
+                .setDefaults(Notification.DEFAULT_SOUND)
+                .setLights(Color.MAGENTA, 500, 1500)
+                .setOngoing(true) //Ongoing notifications are sorted above the regular notifications in the notification panel and  do not have an 'X' close button, and are not affected by the "Clear all" button
+                .setVisibility(Notification.VISIBILITY_PRIVATE);
+            /*
+            NotificationCompat.Builder setDeleteIntent (PendingIntent intent)
+            Supply a PendingIntent to send when the notification is cleared by the user directly from the notification panel. For example, this intent is sent when the user clicks the "Clear all" button, or the individual "X" buttons on notifications. This intent is not sent when the application calls NotificationManager.cancel(int).
+            */
+        // Creates an explicit intent for an Activity in your app
+        Intent parentIntent = new Intent(this, MainActivity.class);
+        // The stack builder object will contain an artificial back stack for the
+        // started Activity.
+        // This ensures that navigating backward from the Activity leads out of
+        // your app to the Home screen.
+        TaskStackBuilder stackBuilder = TaskStackBuilder.create(this);
+        // Adds the back stack for the Intent (but not the Intent itself)
+        stackBuilder.addParentStack(MainActivity.class);
+        // Adds the Intent that starts the Activity to the top of the stack
+        stackBuilder.addNextIntent(parentIntent);
+
+        Intent resultIntent = new Intent(this, ResultSupplyActivity.class);
+
+        Bundle bundle = new Bundle();
+        bundle.putDouble("latitude",latitude);
+        bundle.putDouble("longitude",longitude);
+
+        resultIntent.putExtras(bundle);
+
+        // Adds the Intent that starts the Activity to the top of the stack
+        stackBuilder.addNextIntent(resultIntent);
+        PendingIntent resultPendingIntent =
+                stackBuilder.getPendingIntent(
+                        0,
+                        PendingIntent.FLAG_UPDATE_CURRENT
+                );
+        notificationBuilder.setContentIntent(resultPendingIntent);
+
+        // mNotificationId is a unique integer your app uses to identify the
+        // notification. For example, to cancel the notification, you can pass its ID
+        // number to NotificationManager.cancel().
+        mNotificationManager.notify(getResources().getInteger(R.integer.notification_demand_found_id), notificationBuilder.build());
+    }
+
+    private void broadcastSupplyResult(){
+        LocalBroadcastManager localBroadcastManager = LocalBroadcastManager.getInstance(this);
+        Intent intent = new Intent(BROADCAST_ACTION_DEMAND_FOUND);
+
+        Bundle bundle = new Bundle();
+        bundle.putDouble("latitude",latitude);
+        bundle.putDouble("longitude",longitude);
+
+
+        intent.putExtras(bundle);
+        localBroadcastManager.sendBroadcast(intent);
+    }
+
+    private void broadcastSupplyResultUpdate(){
+        LocalBroadcastManager localBroadcastManager = LocalBroadcastManager.getInstance(this);
+        Intent intent = new Intent(BROADCAST_ACTION_DEMAND_UPDATE);
+        localBroadcastManager.sendBroadcast(intent);
+    }
+
+    private void buildAndFireNotificationAlertLocationOff() {
+        Log.d(TAG, "buildAndFireNotificationAlertLocationOff");
+        notificationBuilder = new NotificationCompat.Builder(this, channel_id);
+        notificationBuilder.setSmallIcon(R.mipmap.ic_launcher)
+                .setContentTitle(getString(R.string.notification_location_off_title))
+                .setContentText(getString(R.string.notification_location_off_text))
+                .setTicker(getString(R.string.notification_location_off_title))
+                .setPriority(Notification.PRIORITY_HIGH) //or Notification.PRIORITY_MAX maybe ?
+                .setAutoCancel(true)
+                .setDefaults(Notification.DEFAULT_VIBRATE)
+                .setDefaults(Notification.DEFAULT_SOUND)
+                .setLights(Color.MAGENTA, 500, 1500)
+                .setVisibility(Notification.VISIBILITY_PRIVATE);
+            /*
+            NotificationCompat.Builder setDeleteIntent (PendingIntent intent)
+            Supply a PendingIntent to send when the notification is cleared by the user directly from the notification panel. For example, this intent is sent when the user clicks the "Clear all" button, or the individual "X" buttons on notifications. This intent is not sent when the application calls NotificationManager.cancel(int).
+            */
+        // mNotificationId is a unique integer your app uses to identify the
+        // notification. For example, to cancel the notification, you can pass its ID
+        // number to NotificationManager.cancel().
+        mNotificationManager.notify(getResources().getInteger(R.integer.notification_supply_found_id), notificationBuilder.build());
+    }
+
+    /**
+     * returns true if all active location providers are disabled
+     * returns false otherwise
+     */
+    private boolean isAllActiveLocationProvidersDisabled(){
+        int tot=0;
+        LocationManager locMan = (LocationManager) getApplicationContext().getSystemService(Context.LOCATION_SERVICE);
+        if(locMan==null)
+            return true;
+        for (int i = 0; i < LocationService.activeProviderList.length; i++) {
+            if (!locMan.isProviderEnabled(LocationService.activeProviderList[i]))
+                tot++;
+        }
+        return (tot == LocationService.activeProviderList.length);
+    }
 }
 
 

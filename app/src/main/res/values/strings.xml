@@ -10,6 +10,9 @@
     <string name="twitter_consumer_key" translatable="false">YOUR_CONSUMER_KEY</string>
     <string name="twitter_consumer_secret" translatable="false">YOUR_CONSUMER_SECRET</string>
 
+    <!-- Google API key -->
+    <string name="google_api_key_map_and_places" translatable="false">AIzaSyA9CESc-y4ilHJRNMne7_H8PsUeAynaNm0</string>
+
     <!-- Firebase "folder" name / structure of the database -->
     <string name="firebase_folder_users" translatable="false">users/</string>
     <string name="firebase_folder_supply" translatable="false">supply/</string>
@@ -26,25 +29,41 @@
     <string name="pref_supply_seats_in_car" translatable="false">supplySeatsInt</string>
     <string name="pref_demand_seats_in_car" translatable="false">demandSeatsInt</string>
     <string name="pref_main_request_boolean" translatable="false">mainRequestBool</string>
+    <string name="pref_main_supply_request_boolean" translatable="false">mainSupplyRequestBool</string>
     <string name="pref_phone_number" translatable="false">phoneNumberString</string>
     <string name="pref_supply_fuel_price" translatable="false">supplyFuelPriceInt</string>
     <string name="pref_supply_pet" translatable="false">supplyPetBool</string>
     <string name="pref_demand_pet" translatable="false">demandPetBool</string>
     <string name="pref_language" translatable="false">languageString</string>
+    <string name="pref_demand_booked_status" translatable="false">bookBool</string>
+    <string name="pref_supply_booked_status" translatable="false">bookBool</string>
+    <string name="pref_resultKey_forDemand" translatable="false">resultKey_forDemandStringSet</string>
+    <string name="pref_resultKey_forSupply" translatable="false">resultKey_forSupplyStringSet</string>
+    <string name="pref_historyKey" translatable="false">historyKeyString</string>
+    <string name="pref_destination" translatable="false">destinationString</string>
+
 
 
     <!-- Notification -->
     <string name="channel_id" translatable="false">com.realtimehitchhiker.hitchgo.NOTIFICATION_CHANNEL_ID</string>
     <string name="channel_name" translatable="false">HitchGo notification</string>
     <string name="channel_description" translatable="false">HitchGo NOTIFICATION_CHANNEL</string>
-    <string name="notification_title">HitchGo found a ride !</string>
-    <string name="notification_text">Click here to confirm</string>
+    <string name="notification_supply_found_title">HitchGo found a ride !</string>
+    <string name="notification_supply_found_text">Click here to confirm</string>
+    <string name="notification_demand_found_title">HitchGo found a rider !</string>
+    <string name="notification_demand_found_text">Click here to see</string>
+    <string name="notification_location_off_title">HitchGo alert</string>
+    <string name="notification_location_off_text">Your location is turn off, but HitchGo app still need it</string>
 
     <!-- MAIN -->
     <string name="button_demand">Request a ride</string>
     <string name="button_demand_cancel">Cancel request</string>
+    <string name="button_demand_finish">Finish request</string>
     <string name="button_supply">Supply a ride</string>
     <string name="button_supply_cancel">Cancel supply</string>
+    <string name="button_supply_finish">Finish supply</string>
+    <string name="button_seeResultDemand">See result</string>
+    <string name="button_seeResultSupply">See result</string>
     <string name="button_login">Login</string>
     <string name="button_logout">Logout</string>
     <string name="alert_dialog_ok">OK</string>
@@ -76,9 +95,10 @@
     <!-- DialogSettings -->
     <string name="button_plus" translatable="false">+</string>
     <string name="button_minus" translatable="false">-</string>
+    <string name="txt_hint_destination">Enter destination</string>
+    <string name="txt_picker_destination">Or pick on a the map</string>
 
     <!-- DialogSupplySettings -->
-    <string name="txt_hint_destination">Enter destination</string>
     <string name="txt_fuel_price">Fuel price</string>
     <string name="txt_seat_supply">Seats available</string>
     <string name="check_box_pet_supply">Allow pet</string>
@@ -92,10 +112,12 @@
     <string name="settings_radius">radius</string>
     <string name="settings_radius_unit">km</string>
 
-    <!-- Result -->
+    <!-- Result (Demand and Supply) -->
     <string name="result">Drive confirmation</string>
     <string name="button_result_call">Call driver</string>
+    <string name="button_result_call_demand">Call rider</string>
     <string name="button_result_book">Book driver</string>
+    <string name="button_result_map">Find rider on map</string>
     <string name="button_next" translatable="false">\u003E</string>
     <string name="button_prev" translatable="false">\u003C</string>
     <string name="txtDetails_dest">Destination :\u0020</string>  <!-- \u0020 is unicode for character space : " " -->
@@ -104,8 +126,13 @@
     <string name="txtDetails_petAllowed_true">Yes</string>
     <string name="txtDetails_petAllowed_false">No</string>
     <string name="txtDetails_remainingSeats">Remaining seats :\u0020</string>
+    <string name="txtDetails_requestingSeats">Requesting seats :\u0020</string>
     <string name="txtProfile_name">Driver\'s name :\u0020</string>
     <string name="txtProfile_phone">Driver\'s phone :\u0020</string>
+    <string name="txtProfile_resultSupply_name">Rider\'s name :\u0020</string>
+    <string name="txtProfile_resultSupply_phone">Rider\'s phone :\u0020</string>
+    <string name="toast_all_seats_gone">Could not book, all the seats are already gone…</string>
+    <string name="toast_all_seats_gone_or_supply_canceled">Could not book, all the seats are already gone…</string>
 
     <!-- Example General settings (not in use)-->
     <string name="pref_header_general">General</string>

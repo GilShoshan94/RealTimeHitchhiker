@@ -48,6 +48,7 @@
         android:drawableLeft="@drawable/com_facebook_button_icon_blue"
         android:elevation="0dp"
         android:text="@string/button_logout"
+        android:textAllCaps="false"
         android:visibility="visible"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
