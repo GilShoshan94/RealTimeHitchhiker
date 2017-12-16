@@ -26,8 +26,10 @@ import com.firebase.geofire.GeoFire;
 import com.firebase.geofire.GeoLocation;
 import com.firebase.geofire.GeoQuery;
 import com.firebase.geofire.GeoQueryEventListener;
+import com.google.firebase.auth.FacebookAuthProvider;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
+import com.google.firebase.auth.UserInfo;
 import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
@@ -60,6 +62,7 @@ public class FirebaseService extends Service {
     private NotificationCompat.Builder notificationBuilder;
 
     private FirebaseUser currentUser;
+    private String facebookUserId = "";
     private DatabaseReference refUsers;
     private DatabaseReference refSupply;
     private DatabaseReference refDemand;
@@ -144,6 +147,13 @@ public class FirebaseService extends Service {
         //For FireBase
         FirebaseAuth mAuth = FirebaseAuth.getInstance();
         currentUser = mAuth.getCurrentUser();
+        // find the Facebook profile and get the user's id
+        for(UserInfo profile : currentUser.getProviderData()) {
+            // check if the provider id matches "facebook.com"
+            if(FacebookAuthProvider.PROVIDER_ID.equals(profile.getProviderId())) {
+                facebookUserId = profile.getUid();
+            }
+        }
         FirebaseDatabase database = FirebaseDatabase.getInstance();
         DatabaseReference myDataBaseRef = database.getReference();
         refUsers = myDataBaseRef.child("users/");
@@ -189,7 +199,11 @@ public class FirebaseService extends Service {
                             if (geoQuery!=null){
                                 initialization_flag = true;
                                 geoQuery.setCenter(new GeoLocation(latitude,longitude));
+                                geoFireDemand.setLocation(facebookUserId, new GeoLocation(latitude, longitude));
                             }
+                        }
+                        else if (supply_true_or_cancel_false){
+                            geoFireSupply.setLocation(facebookUserId, new GeoLocation(latitude, longitude));
                         }
                     }
                 }

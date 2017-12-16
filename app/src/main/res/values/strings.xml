@@ -129,6 +129,8 @@
     <string name="txtDetails_requestingSeats">Requesting seats :\u0020</string>
     <string name="txtProfile_name">Driver\'s name :\u0020</string>
     <string name="txtProfile_phone">Driver\'s phone :\u0020</string>
+    <string name="txtProfile_resultSupply_name">Rider\'s name :\u0020</string>
+    <string name="txtProfile_resultSupply_phone">Rider\'s phone :\u0020</string>
     <string name="toast_all_seats_gone">Could not book, all the seats are already gone…</string>
     <string name="toast_all_seats_gone_or_supply_canceled">Could not book, all the seats are already gone…</string>
 

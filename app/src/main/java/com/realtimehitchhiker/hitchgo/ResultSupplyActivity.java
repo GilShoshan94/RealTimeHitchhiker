@@ -387,9 +387,9 @@ public class ResultSupplyActivity extends AppCompatActivity {
     }
 
     public void setInfoDemandProfileHelper(String name, String phone) {
-        String stringMessage = getString(R.string.txtProfile_name) +
+        String stringMessage = getString(R.string.txtProfile_resultSupply_name) +
                 name + "\n" +
-                getString(R.string.txtProfile_phone) +
+                getString(R.string.txtProfile_resultSupply_phone) +
                 phone;
         txtShowSupplyProfile.setText(stringMessage);
     }

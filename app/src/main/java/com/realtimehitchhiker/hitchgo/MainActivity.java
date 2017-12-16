@@ -1091,10 +1091,10 @@ public class MainActivity extends AppCompatActivity implements SupplyDialogFragm
                 editor.putBoolean(getString(R.string.pref_demand_status), flag_demand);
                 editor.apply();
                 initializeDemandButton();
-                /*if(flag_demand && flagToBroadcastRequestOneTime){ PROBLEM doesn't work as intended... launch more then one time
+                /*if(flag_demand && flagToBroadcastRequestOneTime){ //todo PROBLEM doesn't work as intended... launch more then one time
                     flagToBroadcastRequestOneTime = false;
                     broadcastRequest(true);
-                }*///todo
+                }*/
             }
 
             @Override
@@ -1114,10 +1114,10 @@ public class MainActivity extends AppCompatActivity implements SupplyDialogFragm
                 editor.putBoolean(getString(R.string.pref_supply_status), flag_supply);
                 editor.apply();
                 initializeSupplyButton();
-                /*if(flag_supply && flagToBroadcastSupplyOneTime){ PROBLEM doesn't work as intended... launch more then one time
+                /*if(flag_supply && flagToBroadcastSupplyOneTime){ //todo PROBLEM doesn't work as intended... launch more then one time
                     flagToBroadcastSupplyOneTime = false;
                     broadcastSupplyRequest(true);
-                }*///todo
+                }*/
             }
 
             @Override
