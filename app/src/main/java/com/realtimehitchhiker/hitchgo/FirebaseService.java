@@ -148,12 +148,15 @@ public class FirebaseService extends Service {
         FirebaseAuth mAuth = FirebaseAuth.getInstance();
         currentUser = mAuth.getCurrentUser();
         // find the Facebook profile and get the user's id
-        for(UserInfo profile : currentUser.getProviderData()) {
-            // check if the provider id matches "facebook.com"
-            if(FacebookAuthProvider.PROVIDER_ID.equals(profile.getProviderId())) {
-                facebookUserId = profile.getUid();
+        if(currentUser != null){
+            for(UserInfo profile : currentUser.getProviderData()) {
+                // check if the provider id matches "facebook.com"
+                if(FacebookAuthProvider.PROVIDER_ID.equals(profile.getProviderId())) {
+                    facebookUserId = profile.getUid();
+                }
             }
         }
+
         FirebaseDatabase database = FirebaseDatabase.getInstance();
         DatabaseReference myDataBaseRef = database.getReference();
         refUsers = myDataBaseRef.child("users/");
