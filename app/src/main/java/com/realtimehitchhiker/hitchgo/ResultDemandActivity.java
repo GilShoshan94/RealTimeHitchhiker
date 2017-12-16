@@ -460,6 +460,7 @@ public class ResultDemandActivity extends AppCompatActivity {
                 if (supply.remainingSeats >= demand_seats) {
                     // There is still enough seats, then book
                     supply.remainingSeats = supply.remainingSeats - demand_seats;
+                    historyKey = supply.historyKey; //for safety retrieve again the key
                 } else {
                     // To late, the seats are gone already.
                     return Transaction.abort();
