@@ -421,10 +421,14 @@ public class SupplyDialogFragment extends DialogFragment implements CounterHandl
         if (requestCode == PLACE_PICKER_REQUEST){
             if (resultCode == getActivity().RESULT_OK){
                 placeDestination = PlacePicker.getPlace(getActivity(),data);
+                if(placeDestination==null)
+                    return;
                 Log.i(TAG, "Place1: " + placeDestination.getName());
                 Log.i(TAG, "Place4 GOOD: " + placeDestination.getAddress());
-                Log.i(TAG, "Place5: " + placeDestination.getViewport().toString());
-                Log.i(TAG, "Place6: " + placeDestination.getLatLng());
+                if(placeDestination.getAddress()==null)
+                    return;
+                //Log.i(TAG, "Place5: " + placeDestination.getViewport().toString());
+                //Log.i(TAG, "Place6: " + placeDestination.getLatLng());
                 autocompleteFragment.setText(placeDestination.getAddress());
                 positiveButton.setEnabled(true);
             }

@@ -80,8 +80,7 @@ public class MainActivity extends AppCompatActivity implements SupplyDialogFragm
     public static final String BROADCAST_ACTION_MAIN_SUPPLY_REQUEST = "com.realtimehitchhiker.hitchgo.MAIN_SUPPLY_REQUEST";
     public static final String EXTRA_REQUEST_MESSAGE = "com.realtimehitchhiker.hitchgo.DEMAND_TRUE_CANCEL_FALSE";
     private static final int PERMISSION_LOCATION_REQUEST_CODE = 2;
-    private static final int RC_SIGN_IN = 123; //for FirebaseAuthentication request
-    public static final double EARTH_RADIUS = 6371008.8; //in meter the mean radius of Earth is 6371008.8 m
+    private static final int RC_SIGN_IN = 56; //for FirebaseAuthentication request
     public static final String TAG = "MAIN_DEBUG";
 
     // SharedPreferences parameters
