@@ -1,17 +1,23 @@
 package com.realtimehitchhiker.hitchgo;
 
 import android.Manifest;
+import android.annotation.SuppressLint;
+import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
+import android.location.Location;
+import android.location.LocationManager;
 import android.net.Uri;
 import android.os.Bundle;
 import android.support.annotation.NonNull;
 import android.support.v4.app.ActivityCompat;
+import android.support.v4.content.LocalBroadcastManager;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
 import android.view.View;
@@ -40,8 +46,10 @@ import java.util.Map;
 import java.util.Set;
 
 public class ResultDemandActivity extends AppCompatActivity {
-    public static final String TAG = "RESULT_DEBUG";
-    private static final int MY_PERMISSIONS_REQUEST_CALL_PHONE =1;
+    public static final String TAG = "RESULT_DEMAND_DEBUG";
+    private static final int MY_PERMISSIONS_REQUEST_CALL_PHONE =198765;
+    public static final String BROADCAST_ACTION_RESULT_DEMAND_RESUME = "com.realtimehitchhiker.hitchgo.RESULT_DEMAND_RESUME";
+    public static final String BROADCAST_ACTION_RESULT_DEMAND_PAUSE = "com.realtimehitchhiker.hitchgo.RESULT_DEMAND_PAUSE";
 
     //FireBase
     private FirebaseAuth mAuth;
@@ -55,6 +63,9 @@ public class ResultDemandActivity extends AppCompatActivity {
     private MyGlobalHistory globalHistory;
     private String historyKey;
 
+    private BroadcastReceiver broadcastReceiverLocationUpdate, broadcastReceiverLocationProviderOff,
+            broadcastReceiverSupplyFoundUpdate;
+
     private Button btnCall;
     private Button btnNext;
     private Button btnPrev;
@@ -66,13 +77,13 @@ public class ResultDemandActivity extends AppCompatActivity {
     private String facebookUserId;
     private String phoneFound = "tel:0000000000";
     private int  demand_seats;
-    private Double myLatitude, myLongitude;
+    private Double myLatitude = 90.0, myLongitude = 0.0; //initialize at pole North
 
     private SharedPreferences sharedPref;
     //flag
     private boolean flag_supply;
     private boolean flag_demand;
-    private boolean flag_book;
+    private boolean flag_demand_booked;
 
     //RESULT
     private ArrayList<String> resultKey = new ArrayList<>();
@@ -88,7 +99,7 @@ public class ResultDemandActivity extends AppCompatActivity {
         flag_supply = sharedPref.getBoolean(getString(R.string.pref_supply_status), false);
         flag_demand = sharedPref.getBoolean(getString(R.string.pref_demand_status), false);
         demand_seats = sharedPref.getInt(getString(R.string.pref_demand_seats_in_car), 1);
-        flag_book = sharedPref.getBoolean(getString(R.string.pref_demand_book_satus), false);
+        flag_demand_booked = sharedPref.getBoolean(getString(R.string.pref_demand_booked_status), false);
 
         Set<String> setResultKey = sharedPref.getStringSet(getString(R.string.pref_resultKey_forDemand), null);
         if(setResultKey != null) {
@@ -146,16 +157,113 @@ public class ResultDemandActivity extends AppCompatActivity {
         updateResultUI();
     }
 
+    @Override
+    protected void onResume() {
+        super.onResume();
+        Log.d(TAG, "RESULT_DEMAND_onResume" );
+
+        //Broadcast state of main activity : OnResume
+        broadcastOnResume();
+
+        //Initialize (if need is) the broadcastReceivers for location updates and change in providers status
+        if(broadcastReceiverLocationUpdate == null){
+            broadcastReceiverLocationUpdate = new BroadcastReceiver() {
+                @SuppressLint("SetTextI18n")
+                @Override
+                public void onReceive(Context context, Intent intent) {
+                    Log.d(LocationService.TAG, LocationService.BROADCAST_ACTION_LOCATION_UPDATE);
+                    Location location = (Location)intent.getExtras().get("location");
+                    if(location!=null){
+                        myLatitude = location.getLatitude();
+                        myLongitude = location.getLongitude();
+                    }
+                }
+            };
+        }
+        if(broadcastReceiverLocationProviderOff == null){
+            broadcastReceiverLocationProviderOff = new BroadcastReceiver() {
+                @Override
+                public void onReceive(Context context, Intent intent) {
+                    Log.d(LocationService.TAG, LocationService.BROADCAST_ACTION_LOCATION_OFF);
+                    if(isAllActiveLocationProvidersDisabled()){
+                        //do nothing
+                    }
+                }
+            };
+        }
+        if(broadcastReceiverSupplyFoundUpdate == null) {
+            Log.d(TAG,"broadcastReceiverSupplyFound : INITIALIZE");
+            broadcastReceiverSupplyFoundUpdate = new BroadcastReceiver() {
+                @Override
+                public void onReceive(Context context, Intent intent) {
+                    Set<String> setResultKey = sharedPref.getStringSet(getString(R.string.pref_resultKey_forDemand), null);
+                    if(setResultKey != null) {
+                        if (resultKey.size() > setResultKey.size()) { //then we removed on key
+                            resultKey.clear(); //todo check if correct
+                            resultKey.addAll(setResultKey);
+                            if(index!=0)
+                                index -= 1;
+                            if(index >= resultKey.size())//safety check
+                                index = resultKey.size();
+                        }
+                        else {//then we apparently add key(s) and the index is ok
+                            resultKey.clear(); //todo check if correct
+                            resultKey.addAll(setResultKey);
+                            if(index >= resultKey.size())//safety check
+                                index = resultKey.size();
+                        }
+                        updateResultUI();
+                    }
+                }
+            };
+        }
+
+        //Register the broadcastReceivers locally (internal to the app)
+        LocalBroadcastManager localBroadcastManager = LocalBroadcastManager.getInstance(this);
+        localBroadcastManager.registerReceiver(broadcastReceiverLocationUpdate,new IntentFilter(LocationService.BROADCAST_ACTION_LOCATION_UPDATE));
+        localBroadcastManager.registerReceiver(broadcastReceiverLocationProviderOff,new IntentFilter(LocationService.BROADCAST_ACTION_LOCATION_OFF));
+        localBroadcastManager.registerReceiver(broadcastReceiverSupplyFoundUpdate,new IntentFilter(FirebaseService.BROADCAST_ACTION_SUPPLY_UPDATE));
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        Log.d(TAG, "RESULT_DEMAND_onPause" );
+
+        //Broadcast state of main activity : OnPause
+        broadcastOnPause();
+
+        //Unregister the broadcastReceivers
+        LocalBroadcastManager localBroadcastManager = LocalBroadcastManager.getInstance(this);
+        if(broadcastReceiverLocationUpdate != null){
+            localBroadcastManager.unregisterReceiver(broadcastReceiverLocationUpdate);
+        }
+        if(broadcastReceiverLocationProviderOff != null){
+            localBroadcastManager.unregisterReceiver(broadcastReceiverLocationProviderOff);
+        }
+        if(broadcastReceiverSupplyFoundUpdate != null){
+            localBroadcastManager.unregisterReceiver(broadcastReceiverSupplyFoundUpdate);
+        }
+    }
+
     private void updateResultUI(){
         //If we booked already than, we can just see our supply and we cannot rebook
         //Or if there is no key found
-        if(flag_book || resultKey.size()==0){
+        if(flag_demand_booked || resultKey.size()==0){
             btnBook.setEnabled(false);
             btnNext.setEnabled(false);
             btnPrev.setEnabled(false);
+            btnCall.setEnabled(false);
+            if(resultKey.size()==0) {
+                imProfile.setBackgroundResource(R.drawable.com_facebook_profile_picture_blank_square);
+                txtShowSupplyProfile.setText("");
+                txtShowSupplyDetails.setText("");
+                return;
+            }
         }
         else {
             btnBook.setEnabled(true);
+            btnCall.setEnabled(true);
 
             if (index == (resultKey.size() - 1)) //at the end of the list, there is no next after
                 btnNext.setEnabled(false);
@@ -286,7 +394,7 @@ public class ResultDemandActivity extends AppCompatActivity {
     public void callPhoneNumberSupply(View view) {
         //String phoneNumber = view.getTag().toString();
         Intent callIntent = new Intent(Intent.ACTION_CALL);
-        callIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_DOCUMENT);//todo explain
+        callIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_DOCUMENT);
         callIntent.setData(Uri.parse("tel:"+phoneFound));
         if (ActivityCompat.checkSelfPermission(this,
                 Manifest.permission.CALL_PHONE) != PackageManager.PERMISSION_GRANTED) {
@@ -316,7 +424,7 @@ public class ResultDemandActivity extends AppCompatActivity {
                     //then just simply dial the number
                     Intent dialIntent = new Intent(Intent.ACTION_DIAL);
                     dialIntent.setData(Uri.parse("tel:"+phoneFound));
-                    dialIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_DOCUMENT);//todo explain
+                    dialIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_DOCUMENT);
                     startActivity(dialIntent);
                 }
                 return;
@@ -397,7 +505,7 @@ public class ResultDemandActivity extends AppCompatActivity {
         });
     }
 
-    public void removeSupply(){//todo
+    public void removeSupply(){
         refSupply.child(resultKey.get(index)).removeValue();
         geoFireSupply.removeLocation(resultKey.get(index));
 
@@ -409,7 +517,8 @@ public class ResultDemandActivity extends AppCompatActivity {
 
     public void removeDemand(){
         refDemand.child(facebookUserId).removeValue();
-        geoFireDemand.removeLocation(facebookUserId);
+        //geoFireDemand.removeLocation(facebookUserId);
+        //we do not delete geoFireDemand, it will be the supply that have to delete it
     }
 
     /**
@@ -424,19 +533,29 @@ public class ResultDemandActivity extends AppCompatActivity {
 
     /**
      * finishDemanding stop the services, remove the demand, write into the history
-     *  And set the flag_book=true and flag_demand=false and save them in the shared preferences
+     *  And set the flag_demand_booked=true and flag_demand=false and save them in the shared preferences
      */
     public void finishDemanding() {
         stopMyServices();
         removeDemand();
         addHistoryToFireBase();
 
-        flag_book = true;
+        flag_demand_booked = true;
         flag_demand = false;
         SharedPreferences.Editor editor = sharedPref.edit();
-        editor.putBoolean(getString(R.string.pref_demand_book_satus), flag_book);
+        editor.putBoolean(getString(R.string.pref_demand_booked_status), flag_demand_booked);
         editor.putBoolean(getString(R.string.pref_demand_status), flag_demand);
         editor.apply();
+
+        btnBook.setEnabled(false);
+        btnNext.setEnabled(false);
+        btnPrev.setEnabled(false);
+
+        Set<String> set = new HashSet<>();
+        set.add(resultKey.get(index));
+        SharedPreferences.Editor edit=sharedPref.edit();
+        edit.putStringSet(getString(R.string.pref_resultKey_forDemand), set);
+        edit.apply();
     }
 
     /**
@@ -444,8 +563,42 @@ public class ResultDemandActivity extends AppCompatActivity {
      */
     public void addHistoryToFireBase(){
         Log.d(TAG, "addHistoryToFireBase");
-        String supplyUserId = resultKey.get(index);
-        Map<String, Object> demandUser = globalHistory.setDemandUser(facebookUserId,currentUser.getDisplayName(),demand_seats);
+        String destination = sharedPref.getString(getString(R.string.pref_destination), "Forgot to tell");
+        Map<String, Object> demandUser = globalHistory.setDemandUser(facebookUserId,currentUser.getDisplayName(),demand_seats, destination);
         globalHistory.updateGlobalHistory(historyKey, demandUser, demand_seats);
+    }
+
+    /**
+     * broadcast OnResume locally (internal to the app)
+     */
+    private void broadcastOnResume(){
+        LocalBroadcastManager localBroadcastManager = LocalBroadcastManager.getInstance(this);
+        Intent intent = new Intent(BROADCAST_ACTION_RESULT_DEMAND_RESUME);
+        localBroadcastManager.sendBroadcast(intent);
+    }
+
+    /**
+     * broadcast OnPause locally (internal to the app)
+     */
+    private void broadcastOnPause(){
+        LocalBroadcastManager localBroadcastManager = LocalBroadcastManager.getInstance(this);
+        Intent intent = new Intent(BROADCAST_ACTION_RESULT_DEMAND_PAUSE);
+        localBroadcastManager.sendBroadcast(intent);
+    }
+
+    /**
+     * returns true if all active location providers are disabled
+     * returns false otherwise
+     */
+    private boolean isAllActiveLocationProvidersDisabled(){
+        int tot=0;
+        LocationManager locMan = (LocationManager) getApplicationContext().getSystemService(Context.LOCATION_SERVICE);
+        if(locMan==null)
+            return true;
+        for (int i = 0; i < LocationService.activeProviderList.length; i++) {
+            if (!locMan.isProviderEnabled(LocationService.activeProviderList[i]))
+                tot++;
+        }
+        return (tot == LocationService.activeProviderList.length);
     }
 }

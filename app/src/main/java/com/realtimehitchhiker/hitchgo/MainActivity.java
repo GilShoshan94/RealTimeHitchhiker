@@ -59,8 +59,10 @@ import com.google.firebase.database.Query;
 import com.google.firebase.database.ValueEventListener;
 
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
 
 import io.michaelrocks.libphonenumber.android.NumberParseException;
@@ -75,6 +77,7 @@ public class MainActivity extends AppCompatActivity implements SupplyDialogFragm
     public static final String BROADCAST_ACTION_MAIN_RESUME = "com.realtimehitchhiker.hitchgo.MAIN_RESUME";
     public static final String BROADCAST_ACTION_MAIN_PAUSE = "com.realtimehitchhiker.hitchgo.MAIN_PAUSE";
     public static final String BROADCAST_ACTION_MAIN_REQUEST = "com.realtimehitchhiker.hitchgo.MAIN_REQUEST";
+    public static final String BROADCAST_ACTION_MAIN_SUPPLY_REQUEST = "com.realtimehitchhiker.hitchgo.MAIN_SUPPLY_REQUEST";
     public static final String EXTRA_REQUEST_MESSAGE = "com.realtimehitchhiker.hitchgo.DEMAND_TRUE_CANCEL_FALSE";
     private static final int PERMISSION_LOCATION_REQUEST_CODE = 2;
     private static final int RC_SIGN_IN = 123; //for FirebaseAuthentication request
@@ -90,6 +93,7 @@ public class MainActivity extends AppCompatActivity implements SupplyDialogFragm
     private int seats_in_car;
     private int demand_seats;
     private String phone_number;
+    private String historyKey;
 
     // Firebase variables
     private FirebaseAuth mAuth;
@@ -136,6 +140,8 @@ public class MainActivity extends AppCompatActivity implements SupplyDialogFragm
     private boolean flag_login = false;
     private boolean flag_supply;
     private boolean flag_demand;
+    private boolean flag_supply_booked;
+    private boolean flag_demand_booked;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -197,6 +203,7 @@ public class MainActivity extends AppCompatActivity implements SupplyDialogFragm
         flag_supply = sharedPref.getBoolean(getString(R.string.pref_supply_status), false);
         flag_demand = sharedPref.getBoolean(getString(R.string.pref_demand_status), false);
         phone_number = sharedPref.getString(getString(R.string.pref_phone_number), "false");
+        historyKey = sharedPref.getString(getString(R.string.pref_historyKey), "-n-u-l-l-");
         Log.d(TAG, "getSharedPreferences : radius = " + radius );
 
     }
@@ -232,6 +239,9 @@ public class MainActivity extends AppCompatActivity implements SupplyDialogFragm
         //Check if user is signed in (non-null) and update UI accordingly. And stop the services if user is signed out
         currentUser = mAuth.getCurrentUser();
         updateUI(currentUser);
+        if(currentUser!= null){
+            checkSupplyDemandStatusAndUpdateUI();
+        }
     }
 
     @Override
@@ -293,7 +303,7 @@ public class MainActivity extends AppCompatActivity implements SupplyDialogFragm
                     Bundle bundle = new Bundle(intent.getExtras());
                     Log.d(TAG,"broadcastReceiverDemandFound : onReceive " + bundle.toString());
 
-                    callDemandResultActivity(bundle);
+                    callSupplyResultActivity(bundle);
                 }
             };
         }
@@ -513,7 +523,11 @@ public class MainActivity extends AppCompatActivity implements SupplyDialogFragm
     private void initializeSupplyButton() {
         //if already supplying
         if (flag_supply){
-            btnSupply.setText(R.string.button_supply_cancel);
+            if (flag_supply_booked) //if someone already booked you
+                btnSupply.setText(R.string.button_supply_finish);
+            else
+                btnSupply.setText(R.string.button_supply_cancel);
+
             btnDemand.setEnabled(false);
             btnResultSupply.setEnabled(true);
             btnResultDemand.setEnabled(false);
@@ -522,8 +536,6 @@ public class MainActivity extends AppCompatActivity implements SupplyDialogFragm
         else {
             btnSupply.setText(R.string.button_supply);
             btnDemand.setEnabled(true);
-            btnResultSupply.setEnabled(false);
-            btnResultDemand.setEnabled(false);
         }
 
         //setOnClickListener for the Supply button
@@ -533,13 +545,26 @@ public class MainActivity extends AppCompatActivity implements SupplyDialogFragm
                 Button b = (Button) view;
                 if (!flag_supply) {
                     addSupplyToFirebase();
-                } else {
+                }
+                else if (!flag_supply_booked){
                     if(removeSupplyFromFirebase()) {
                         flag_supply = false;
                         b.setText(R.string.button_supply);
 
                         SharedPreferences.Editor editor = sharedPref.edit();
                         editor.putBoolean(getString(R.string.pref_supply_status), flag_supply);
+                        editor.apply();
+                    }
+                }
+                else {
+                    if(finishSupplyFromFirebase()) {
+                        flag_supply = false;
+                        flag_supply_booked = false;
+                        b.setText(R.string.button_supply);
+
+                        SharedPreferences.Editor editor = sharedPref.edit();
+                        editor.putBoolean(getString(R.string.pref_supply_status), flag_supply);
+                        editor.putBoolean(getString(R.string.pref_supply_booked_status), flag_supply_booked);
                         editor.apply();
                     }
                 }
@@ -553,7 +578,11 @@ public class MainActivity extends AppCompatActivity implements SupplyDialogFragm
     private void initializeDemandButton() {
         //if already demanding
         if (flag_demand){
-            btnDemand.setText(R.string.button_demand_cancel);
+            if (flag_supply_booked) //if you already booked someone
+                btnDemand.setText(R.string.button_demand_finish);
+            else
+                btnDemand.setText(R.string.button_demand_cancel);
+
             btnSupply.setEnabled(false);
             btnResultSupply.setEnabled(false);
             btnResultDemand.setEnabled(true);
@@ -562,8 +591,6 @@ public class MainActivity extends AppCompatActivity implements SupplyDialogFragm
         else {
             btnDemand.setText(R.string.button_demand);
             btnSupply.setEnabled(true);
-            btnResultSupply.setEnabled(false);
-            btnResultDemand.setEnabled(false);
         }
 
         //setOnClickListener for the Demand button
@@ -573,13 +600,26 @@ public class MainActivity extends AppCompatActivity implements SupplyDialogFragm
                 Button b = (Button) view;
                 if (!flag_demand) {
                     addDemandToFireBase();
-                } else {
+                }
+                else if (!flag_demand_booked) {
                     if(removeDemandFromFireBase()){
                         flag_demand = false;
                         b.setText(R.string.button_demand);
 
                         SharedPreferences.Editor editor = sharedPref.edit();
                         editor.putBoolean(getString(R.string.pref_demand_status), flag_demand);
+                        editor.apply();
+                    }
+                }
+                else {
+                    if(removeDemandFromFireBase()){
+                        flag_demand = false;
+                        flag_demand_booked = false;
+                        b.setText(R.string.button_demand);
+
+                        SharedPreferences.Editor editor = sharedPref.edit();
+                        editor.putBoolean(getString(R.string.pref_demand_status), flag_demand);
+                        editor.putBoolean(getString(R.string.pref_demand_booked_status), flag_demand_booked);
                         editor.apply();
                     }
                 }
@@ -602,16 +642,6 @@ public class MainActivity extends AppCompatActivity implements SupplyDialogFragm
             txtWelcome.setText(R.string.ui_welcome_logged_in);
             txtWelcome.append("\n" + user.getDisplayName());
 
-            //Show the UI for logged in users
-            btnSupply.setVisibility(View.VISIBLE);
-            btnDemand.setVisibility(View.VISIBLE);
-            btnResultSupply.setVisibility(View.VISIBLE);
-            btnResultDemand.setVisibility(View.VISIBLE);
-            txtShowLocation.setVisibility(View.VISIBLE);
-            imProfile.setVisibility(View.VISIBLE);
-            imageButtonSetting.setVisibility(View.VISIBLE);
-            btnLog.setVisibility(View.GONE);
-
             // find the Facebook profile and get the user's id
             for(UserInfo profile : currentUser.getProviderData()) {
                 // check if the provider id matches "facebook.com"
@@ -626,24 +656,35 @@ public class MainActivity extends AppCompatActivity implements SupplyDialogFragm
             new DownloadImageTask(new DownloadImageTask.AsyncResponse() {
                 @Override
                 public void processFinish(Bitmap output) {
-                    //imProfile.setImageBitmap(output);
                     Drawable drawable = new BitmapDrawable(getResources(), output);
                     imProfile.setBackground(drawable);
                 }
             }).execute(photoUrl);
 
             //initialize supply and demand button accordingly to the user state
-            checkSupplyDemandStatusAndUpdateUI();
+            //checkSupplyDemandStatusAndUpdateUI(); NOPE BAD
+            initializeSupplyButton();
+            initializeDemandButton();
 
             //Make sure the services are started
             enableFirebaseAndLocationService();
+
+            //Show the UI for logged in users
+            btnSupply.setVisibility(View.VISIBLE);
+            btnDemand.setVisibility(View.VISIBLE);
+            btnResultSupply.setVisibility(View.VISIBLE);
+            btnResultDemand.setVisibility(View.VISIBLE);
+            txtShowLocation.setVisibility(View.VISIBLE);
+            imProfile.setVisibility(View.VISIBLE);
+            imageButtonSetting.setVisibility(View.VISIBLE);
+            btnLog.setVisibility(View.GONE);
         }
         //else not already signed in
         else{
             //set the UI and initialize the Log Button
             initializeLogButton(false);
             txtWelcome.setText(R.string.ui_welcome_logged_out);
-            imProfile.setImageResource(R.drawable.com_facebook_profile_picture_blank_square);
+            imProfile.setBackgroundResource(R.drawable.com_facebook_profile_picture_blank_square);
 
             //Hide the UI
             btnSupply.setVisibility(View.INVISIBLE);
@@ -805,7 +846,22 @@ public class MainActivity extends AppCompatActivity implements SupplyDialogFragm
      */
     public void callDemandResultActivity(View view) {
         Log.d(TAG, "MAIN_callDemandResultActivity");
+        if(currentUser==null){
+            Toast.makeText(getApplicationContext(), R.string.toast_not_logged_in,
+                    Toast.LENGTH_SHORT).show();
+            return;
+        }
+
         Intent resultIntent = new Intent(this, ResultDemandActivity.class);
+
+        if(location!=null){
+            Bundle bundle = new Bundle();
+            bundle.putDouble("latitude",latitude);
+            bundle.putDouble("longitude",longitude);
+
+            resultIntent.putExtras(bundle);
+        }
+
         startActivity(resultIntent);
     }
 
@@ -816,6 +872,12 @@ public class MainActivity extends AppCompatActivity implements SupplyDialogFragm
         Log.d(TAG, "MAIN_callSupplyResultActivity bundle.toString() = " + bundle.toString() );
         Intent resultIntent = new Intent(this, ResultSupplyActivity.class);
 
+        flag_supply_booked = true;
+        SharedPreferences.Editor editor = sharedPref.edit();
+        editor.putBoolean(getString(R.string.pref_supply_booked_status), flag_supply_booked);
+        editor.apply();
+        initializeSupplyButton();
+
         resultIntent.putExtras(bundle);
         startActivity(resultIntent);
     }
@@ -825,7 +887,22 @@ public class MainActivity extends AppCompatActivity implements SupplyDialogFragm
      */
     public void callSupplyResultActivity(View view) {
         Log.d(TAG, "MAIN_callSupplyResultActivity");
+        if(currentUser==null){
+            Toast.makeText(getApplicationContext(), R.string.toast_not_logged_in,
+                    Toast.LENGTH_SHORT).show();
+            return;
+        }
+
         Intent resultIntent = new Intent(this, ResultSupplyActivity.class);
+
+        if(location!=null){
+            Bundle bundle = new Bundle();
+            bundle.putDouble("latitude",latitude);
+            bundle.putDouble("longitude",longitude);
+
+            resultIntent.putExtras(bundle);
+        }
+
         startActivity(resultIntent);
     }
 
@@ -996,6 +1073,8 @@ public class MainActivity extends AppCompatActivity implements SupplyDialogFragm
         myRef.setValue(myUser);
     }
 
+    private boolean flagToBroadcastRequestOneTime = true; //helper flag
+    private boolean flagToBroadcastSupplyOneTime = true; //helper flag
     /**
      * check Supply Demand status and update UI, current user must be logged in to call this function
      * will query the database to find the user's Supply and Demand status, and will set the flags and buttons accordingly
@@ -1011,6 +1090,10 @@ public class MainActivity extends AppCompatActivity implements SupplyDialogFragm
                 editor.putBoolean(getString(R.string.pref_demand_status), flag_demand);
                 editor.apply();
                 initializeDemandButton();
+                if(flag_demand && flagToBroadcastRequestOneTime){
+                    flagToBroadcastRequestOneTime = false;
+                    broadcastRequest(true);
+                }
             }
 
             @Override
@@ -1030,6 +1113,10 @@ public class MainActivity extends AppCompatActivity implements SupplyDialogFragm
                 editor.putBoolean(getString(R.string.pref_supply_status), flag_supply);
                 editor.apply();
                 initializeSupplyButton();
+                if(flag_supply && flagToBroadcastSupplyOneTime){
+                    flagToBroadcastSupplyOneTime = false;
+                    broadcastSupplyRequest(true);
+                }
             }
 
             @Override
@@ -1068,6 +1155,15 @@ public class MainActivity extends AppCompatActivity implements SupplyDialogFragm
     }
     @Override
     public void onSupplyDialogPositiveClick(DialogFragment dialog) {
+        //reset the found keys
+        Set<String> set = new HashSet<>();
+        set.clear();
+        SharedPreferences.Editor edit=sharedPref.edit();
+        edit.putStringSet(getString(R.string.pref_resultKey_forSupply), set);
+        edit.apply();
+
+        broadcastSupplyRequest(true);
+
         flag_supply = true;
         btnSupply.setText(R.string.button_supply_cancel);
         btnResultSupply.setEnabled(true);
@@ -1093,7 +1189,7 @@ public class MainActivity extends AppCompatActivity implements SupplyDialogFragm
     }
 
     /**
-     * remove Supply to Firebase
+     * remove Supply to Firebase, and the history, to use in the case the supply cancel and nobody booked
      */
     public boolean removeSupplyFromFirebase(){
         if(currentUser==null){
@@ -1101,11 +1197,39 @@ public class MainActivity extends AppCompatActivity implements SupplyDialogFragm
                     Toast.LENGTH_SHORT).show();
             return false;
         }
+        broadcastSupplyRequest(false);
+
+        historyKey = sharedPref.getString(getString(R.string.pref_historyKey), "-n-u-l-l-");
+        Log.d(TAG, "historyKey = "+ historyKey);
+
+        refSupply.child(facebookUserId).removeValue();
+        geoFireSupply.removeLocation(facebookUserId);
+        refHistory.child(historyKey).removeValue();
+
+        //enable back the Demand button (cannot demand and supply in simultaneously)
+        btnDemand.setEnabled(true);
+        btnResultDemand.setEnabled(true);
+
+        return true;
+    }
+
+    /**
+     * remove Supply to Firebase, but not the history.
+     */
+    public boolean finishSupplyFromFirebase(){
+        if(currentUser==null){
+            Toast.makeText(getApplicationContext(), R.string.toast_not_logged_in,
+                    Toast.LENGTH_SHORT).show();
+            return false;
+        }
+        broadcastSupplyRequest(false);
+
         refSupply.child(facebookUserId).removeValue();
         geoFireSupply.removeLocation(facebookUserId);
 
         //enable back the Demand button (cannot demand and supply in simultaneously)
         btnDemand.setEnabled(true);
+        btnResultDemand.setEnabled(true);
 
         return true;
     }
@@ -1138,6 +1262,14 @@ public class MainActivity extends AppCompatActivity implements SupplyDialogFragm
     }
     @Override
     public void onDemandDialogPositiveClick(DialogFragment dialog) {
+        //reset the found keys and the flag flag_demand_booked
+        Set<String> set = new HashSet<>();
+        set.clear();
+        SharedPreferences.Editor edit=sharedPref.edit();
+        edit.putStringSet(getString(R.string.pref_resultKey_forDemand), set);
+        edit.putBoolean(getString(R.string.pref_demand_booked_status), false);
+        edit.apply();
+
         broadcastRequest(true);
 
         flag_demand = true;
@@ -1179,6 +1311,7 @@ public class MainActivity extends AppCompatActivity implements SupplyDialogFragm
 
         //enable back the Supply button (cannot demand and supply in simultaneously)
         btnSupply.setEnabled(true);
+        btnResultSupply.setEnabled(true);
 
         return true;
     }
@@ -1213,24 +1346,15 @@ public class MainActivity extends AppCompatActivity implements SupplyDialogFragm
         localBroadcastManager.sendBroadcast(intent);
     }
 
-    //todo to delete this part when not needed
-    //FOR TESTING
-    public double randomLatGen(){
-        double min = latitude-approxLatDelta();
-        double max = latitude+approxLatDelta();
-        return ThreadLocalRandom.current().nextDouble(min, max);
-    }
-    public double randomLngGen(){
-        double min = longitude-approxLngDelta();
-        double max = longitude+approxLngDelta();
-        return ThreadLocalRandom.current().nextDouble(min, max);
-    }
-    private double approxLatDelta(){
-        double dist = radius*1000; //radius is in km and we need it in m
-        return (180/Math.PI)*(dist/EARTH_RADIUS);
-    }
-    private double approxLngDelta(){
-        double dist = radius*1000; //radius is in km and we need it in m
-        return (180/Math.PI)*(dist/EARTH_RADIUS)*(1/Math.cos(latitude));
+    /**
+     * broadcast SupplyRequest (a change in supply status) locally (internal to the app)
+     *
+     * @param supply_true_or_cancel_false TRUE for the demand has been made, FALSE for the demand has been cancelled
+     */
+    private void broadcastSupplyRequest(boolean supply_true_or_cancel_false){
+        LocalBroadcastManager localBroadcastManager = LocalBroadcastManager.getInstance(this);
+        Intent intent = new Intent(BROADCAST_ACTION_MAIN_SUPPLY_REQUEST);
+        intent.putExtra("supply_true_or_cancel_false", supply_true_or_cancel_false);
+        localBroadcastManager.sendBroadcast(intent);
     }
 }

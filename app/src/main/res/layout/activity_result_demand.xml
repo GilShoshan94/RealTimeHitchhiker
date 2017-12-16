@@ -39,6 +39,7 @@
         android:layout_marginStart="8dp"
         android:onClick="callPhoneNumberSupply"
         android:text="@string/button_result_call"
+        android:textAllCaps="false"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent" />
@@ -85,6 +86,7 @@
         android:layout_marginStart="8dp"
         android:onClick="bookSupply"
         android:text="@string/button_result_book"
+        android:textAllCaps="false"
         app:layout_constraintBottom_toTopOf="@+id/button_call"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent" />

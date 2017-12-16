@@ -160,6 +160,7 @@ public class DemandDialogFragment extends DialogFragment {
                         SharedPreferences.Editor editor = sharedPref.edit();
                         editor.putInt(getString(R.string.pref_demand_seats_in_car), demand_seats);
                         editor.putBoolean(getString(R.string.pref_demand_pet), demand_pet);
+                        editor.putString(getString(R.string.pref_destination),destination);
                         editor.apply();
 
                         MyDemand myDemand = new MyDemand(destination, demand_seats, demand_pet);

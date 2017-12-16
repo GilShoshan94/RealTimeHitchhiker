@@ -10,6 +10,7 @@ import android.location.Address;
 import android.location.Geocoder;
 import android.location.Location;
 import android.util.Log;
+import android.widget.Toast;
 
 import com.firebase.geofire.GeoLocation;
 import com.firebase.geofire.LocationCallback;
@@ -17,6 +18,8 @@ import com.firebase.geofire.core.GeoHash;
 import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
+import com.google.firebase.database.MutableData;
+import com.google.firebase.database.Transaction;
 import com.google.firebase.database.ValueEventListener;
 import com.google.firebase.database.GenericTypeIndicator;
 
@@ -104,10 +107,11 @@ public class MyGlobalHistory {
      * @param name              The name of the Demand user
      * @param requestingSeats   The number of seats requested by the Demand user
      */
-    Map<String, Object> setDemandUser(String id, String name, int requestingSeats){
+    Map<String, Object> setDemandUser(String id, String name, int requestingSeats, String demandDestination){
         Map<String, Object> demandUserDetails = new HashMap<>();
         demandUserDetails.put("name", name);
         demandUserDetails.put("requestingSeats", requestingSeats);
+        demandUserDetails.put("destination", demandDestination);
 
         Map<String, Object> demandUser = new HashMap<String, Object>();
         demandUser.put(id, demandUserDetails);
@@ -188,8 +192,8 @@ public class MyGlobalHistory {
         updates.put("g-departure", geoHashFrom.getGeoHashString());
         updates.put("l-destination", Arrays.asList(toLocation.latitude, toLocation.longitude));
         updates.put("l-departure", Arrays.asList(fromLocation.latitude, fromLocation.longitude));
-        updates.put("Departure", fromLocationString);
-        updates.put("Destination", toLocationString);
+        updates.put("departure", fromLocationString);
+        updates.put("destination", toLocationString);
         updates.put("supplyUser", supplyUser);
         updates.put("offeredSeats", offeredSeats);
         updates.put("usedSeats", 0);
@@ -238,7 +242,6 @@ public class MyGlobalHistory {
         DatabaseReference keyRef = this.getDatabaseRefForKey(key);
 
         Map<String, Object> updates = new HashMap<String, Object>();
-        //updates.put("usedSeats", usedSeats); //todo transaction on usedSeats
         updates.put("demandUsers", demandUser);
         if (completionListener != null) {
             keyRef.setValue(updates, new DatabaseReference.CompletionListener() {
@@ -250,6 +253,7 @@ public class MyGlobalHistory {
         } else {
             keyRef.updateChildren(updates);
         }
+        transactionUpdateUsedSeats(key, usedSeats);
     }
 
     private String getReverseGeoCoding(Context context, GeoLocation location) {
@@ -294,6 +298,43 @@ public class MyGlobalHistory {
             // Can safely ignore
         }
         return "unknown address";
+    }
+
+    public void transactionUpdateUsedSeats(final String key, final Integer usedSeats) {
+        DatabaseReference keyRef = this.getDatabaseRefForKey(key);
+        keyRef.runTransaction(new Transaction.Handler() {
+            @Override
+            public Transaction.Result doTransaction(MutableData mutableData) {
+                Integer usedSeats_old = mutableData.child("usedSeats").getValue(Integer.class);
+                if (usedSeats_old == null) {
+                    Log.d("_", "do Transaction : usedSeats_old == null");
+                    //Note: Because doTransaction() is called multiple times, it must be able to handle null data. Even if there is existing data in your remote database, it may not be locally cached when the transaction function is run, resulting in null for the initial value.
+                    return Transaction.success(mutableData);
+                }
+
+                Log.d("_", "do Transaction : usedSeats_old != null");
+                usedSeats_old += usedSeats;
+
+                // Set value and report transaction success
+                mutableData.child("usedSeats").setValue(usedSeats_old);
+                return Transaction.success(mutableData);
+            }
+
+            @Override
+            public void onComplete(DatabaseError databaseError, boolean committed,
+                                   DataSnapshot currentData) {
+                // Transaction completed
+                if (databaseError != null) {
+                    Log.d("_", "post Transaction:onComplete databaseError:" + databaseError);
+                }
+                if(committed){
+                    Log.d("_", "post Transaction:onComplete:" + currentData);
+                }
+                else {
+                    Log.d("_", "post Transaction:onComplete: not committed");
+                }
+            }
+        });
     }
 
 }

@@ -167,13 +167,14 @@ public class SupplyDialogFragment extends DialogFragment implements CounterHandl
                         if(Objects.equals(destination, "") || Objects.equals(destination, " "))
                             destination = "Forgot to tell...";
 
+                        String historyKey = refSupply.push().getKey();
+
                         SharedPreferences.Editor editor = sharedPref.edit();
                         editor.putInt(getString(R.string.pref_supply_seats_in_car), seats_in_car);
                         editor.putInt(getString(R.string.pref_supply_fuel_price), fuel_price);
                         editor.putBoolean(getString(R.string.pref_supply_pet), allow_pet_supply);
+                        editor.putString(getString(R.string.pref_historyKey), historyKey);
                         editor.apply();
-
-                        String historyKey = refSupply.push().getKey();
 
                         MySupply mySupply = new MySupply(destination, seats_in_car, fuel_price, currency, allow_pet_supply, historyKey);
                         refSupply.child(facebookUserId).setValue(mySupply);
