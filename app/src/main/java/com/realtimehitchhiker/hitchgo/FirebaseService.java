@@ -719,7 +719,7 @@ public class FirebaseService extends Service {
             //Add resultKey to resultKeySent to be able to remember what we sent and save it
             resultKeySent.addAll(resultKey);
             Set<String> set = new HashSet<>();
-            set.addAll(resultKey);
+            set.addAll(resultKeySent);
             SharedPreferences.Editor edit=sharedPref.edit();
             edit.putStringSet(getString(R.string.pref_resultKey_forDemand), set);
             edit.apply();
