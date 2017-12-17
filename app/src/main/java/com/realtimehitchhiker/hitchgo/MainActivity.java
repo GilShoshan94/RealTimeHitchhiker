@@ -554,6 +554,7 @@ public class MainActivity extends AppCompatActivity implements SupplyDialogFragm
 
                         SharedPreferences.Editor editor = sharedPref.edit();
                         editor.putBoolean(getString(R.string.pref_supply_status), flag_supply);
+                        editor.putBoolean(getString(R.string.pref_flagThereIsOneSupplyAlready), false); //todo check
                         editor.apply();
                     }
                 }
@@ -566,6 +567,7 @@ public class MainActivity extends AppCompatActivity implements SupplyDialogFragm
                         SharedPreferences.Editor editor = sharedPref.edit();
                         editor.putBoolean(getString(R.string.pref_supply_status), flag_supply);
                         editor.putBoolean(getString(R.string.pref_supply_booked_status), flag_supply_booked);
+                        editor.putBoolean(getString(R.string.pref_flagThereIsOneSupplyAlready), false); //todo check
                         editor.apply();
                     }
                 }
@@ -1074,8 +1076,6 @@ public class MainActivity extends AppCompatActivity implements SupplyDialogFragm
         myRef.setValue(myUser);
     }
 
-    private boolean flagToBroadcastRequestOneTime = true; //helper flag
-    private boolean flagToBroadcastSupplyOneTime = true; //helper flag
     /**
      * check Supply Demand status and update UI, current user must be logged in to call this function
      * will query the database to find the user's Supply and Demand status, and will set the flags and buttons accordingly
@@ -1091,10 +1091,10 @@ public class MainActivity extends AppCompatActivity implements SupplyDialogFragm
                 editor.putBoolean(getString(R.string.pref_demand_status), flag_demand);
                 editor.apply();
                 initializeDemandButton();
-                /*if(flag_demand && flagToBroadcastRequestOneTime){ //todo PROBLEM doesn't work as intended... launch more then one time
-                    flagToBroadcastRequestOneTime = false;
+                boolean flagThereIsOneRequestAlready = sharedPref.getBoolean(getString(R.string.pref_flagThereIsOneRequestAlready), false);
+                if(flag_demand && !flagThereIsOneRequestAlready){ //todo before :PROBLEM doesn't work as intended... launch more then one time, Now : need to test
                     broadcastRequest(true);
-                }*/
+                }
             }
 
             @Override
@@ -1114,10 +1114,10 @@ public class MainActivity extends AppCompatActivity implements SupplyDialogFragm
                 editor.putBoolean(getString(R.string.pref_supply_status), flag_supply);
                 editor.apply();
                 initializeSupplyButton();
-                /*if(flag_supply && flagToBroadcastSupplyOneTime){ //todo PROBLEM doesn't work as intended... launch more then one time
-                    flagToBroadcastSupplyOneTime = false;
+                boolean flagThereIsOneSupplyAlready = sharedPref.getBoolean(getString(R.string.pref_flagThereIsOneSupplyAlready), false);
+                if(flag_supply && flagThereIsOneSupplyAlready){ //todo before :PROBLEM doesn't work as intended... launch more then one time, Now : need to test
                     broadcastSupplyRequest(true);
-                }*/
+                }
             }
 
             @Override

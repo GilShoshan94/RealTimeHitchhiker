@@ -180,6 +180,11 @@ public class FirebaseService extends Service {
             resultKeySent.clear();
             resultKeySent.addAll(setResultKey);
         }
+
+        SharedPreferences.Editor editor = sharedPref.edit();
+        editor.putBoolean(getString(R.string.pref_flagThereIsOneRequestAlready), false); //todo check
+        editor.putBoolean(getString(R.string.pref_flagThereIsOneSupplyAlready), false); //todo check
+        editor.commit();
     }
 
     @Override
@@ -298,10 +303,16 @@ public class FirebaseService extends Service {
                 public void onReceive(Context context, Intent intent) {
                     demand_true_or_cancel_false = (boolean)intent.getExtras().get(MainActivity.EXTRA_REQUEST_MESSAGE);
                     Log.d(TAG, "broadcastReceiverMain_REQUEST bool : " + demand_true_or_cancel_false);
+                    //todo check if this new code work for when restarting the app and resume mainRequest
+                    boolean flagThereIsOneRequestAlready = sharedPref.getBoolean(getString(R.string.pref_flagThereIsOneRequestAlready), false);
                     SharedPreferences.Editor editor = sharedPref.edit();
                     editor.putBoolean(getString(R.string.pref_main_request_boolean), demand_true_or_cancel_false);
                     editor.apply();
-                    mainRequest();
+                    if(!flagThereIsOneRequestAlready){
+                        editor.putBoolean(getString(R.string.pref_flagThereIsOneRequestAlready), true);
+                        editor.apply();
+                        mainRequest();
+                    }
                 }
             };
         }
@@ -323,12 +334,18 @@ public class FirebaseService extends Service {
                 public void onReceive(Context context, Intent intent) {
                     supply_true_or_cancel_false = (boolean)intent.getExtras().get("supply_true_or_cancel_false");
                     Log.d(TAG, "broadcastReceiverMain_SUPPLY_REQUEST bool : " + supply_true_or_cancel_false);
+                    //todo check if this new code work for when restarting the app and resume mainSupplyRequest
+                    boolean flagThereIsOneSupplyAlready = sharedPref.getBoolean(getString(R.string.pref_flagThereIsOneSupplyAlready), false);
                     SharedPreferences.Editor editor = sharedPref.edit();
                     editor.putBoolean(getString(R.string.pref_main_supply_request_boolean), supply_true_or_cancel_false);
                     editor.apply();
                     String historyKey = sharedPref.getString(getString(R.string.pref_historyKey), "-n-u-l-l-");
                     listenNewDemandQuery = refHistory.orderByKey().equalTo(historyKey);
-                    mainSupplyRequest();
+                    if(!flagThereIsOneSupplyAlready){
+                        editor.putBoolean(getString(R.string.pref_flagThereIsOneSupplyAlready), true);
+                        editor.apply();
+                        mainSupplyRequest();
+                    }
                 }
             };
         }

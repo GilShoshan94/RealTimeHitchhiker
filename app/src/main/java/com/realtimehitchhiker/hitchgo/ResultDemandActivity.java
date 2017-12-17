@@ -547,6 +547,7 @@ public class ResultDemandActivity extends AppCompatActivity {
         SharedPreferences.Editor editor = sharedPref.edit();
         editor.putBoolean(getString(R.string.pref_demand_booked_status), flag_demand_booked);
         editor.putBoolean(getString(R.string.pref_demand_status), flag_demand);
+        editor.putBoolean(getString(R.string.pref_flagThereIsOneRequestAlready), false); //todo check
         editor.apply();
 
         btnBook.setEnabled(false);

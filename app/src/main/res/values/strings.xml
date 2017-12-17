@@ -41,8 +41,8 @@
     <string name="pref_resultKey_forSupply" translatable="false">resultKey_forSupplyStringSet</string>
     <string name="pref_historyKey" translatable="false">historyKeyString</string>
     <string name="pref_destination" translatable="false">destinationString</string>
-
-
+    <string name="pref_flagThereIsOneRequestAlready" translatable="false">flagThereIsOneRequestAlreadyString</string>
+    <string name="pref_flagThereIsOneSupplyAlready" translatable="false">flagThereIsOneSupplyAlreadyString</string>
 
     <!-- Notification -->
     <string name="channel_id" translatable="false">com.realtimehitchhiker.hitchgo.NOTIFICATION_CHANNEL_ID</string>
